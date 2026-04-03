@@ -1,0 +1,148 @@
+/**
+ * Mwaniki Furnitures POS — Print Stylesheet
+ * Applied only when window.print() is called.
+ * Hides all UI chrome and renders only the receipt body.
+ */
+
+@media print {
+
+    /* ── Hide all app UI ─────────────────────────────────────────────── */
+    #app-header,
+    #main-nav,
+    #app-main,
+    #toast-container,
+    .modal-overlay,
+    .receipt-screen-header,
+    .receipt-actions,
+    .qty-modal-overlay {
+        display: none !important;
+    }
+
+    /* ── Show ONLY the receipt body ──────────────────────────────────── */
+    body {
+        background: #fff !important;
+        color: #000 !important;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 12pt;
+        margin: 0;
+        padding: 0;
+    }
+
+    /* Force the overlay and modal to be visible for printing */
+    .modal-overlay {
+        display: flex !important;
+        position: static !important;
+        background: none !important;
+        backdrop-filter: none !important;
+        align-items: flex-start !important;
+        justify-content: center !important;
+        padding: 0 !important;
+    }
+
+    .receipt-modal {
+        box-shadow: none !important;
+        border: none !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        transform: none !important;
+        background: #fff !important;
+        padding: 0 !important;
+    }
+
+    /* Show screen header in print too (as receipt title) */
+    .receipt-screen-header {
+        display: block !important;
+        text-align: center;
+        color: #000 !important;
+        padding: 0 0 0.5rem !important;
+    }
+
+    .receipt-screen-header h3 {
+        font-size: 14pt;
+        color: #000;
+    }
+
+    .receipt-screen-header p {
+        font-size: 10pt;
+        color: #444;
+    }
+
+    /* ── Receipt body on paper ───────────────────────────────────────── */
+    .receipt-body {
+        background: #fff !important;
+        border: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        color: #000 !important;
+        font-size: 11pt;
+    }
+
+    .receipt-logo {
+        font-size: 1.5rem;
+    }
+
+    .receipt-shop-name {
+        font-size: 16pt;
+        font-weight: bold;
+        color: #000 !important;
+    }
+
+    .receipt-shop-sub {
+        font-size: 9pt;
+        color: #555 !important;
+    }
+
+    .receipt-divider {
+        color: #555 !important;
+        font-size: 10pt;
+    }
+
+    .receipt-meta span:first-child {
+        color: #555 !important;
+    }
+
+    .receipt-meta span:last-child {
+        color: #000 !important;
+    }
+
+    /* Items table */
+    .receipt-items {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 10pt;
+    }
+
+    .receipt-items th {
+        border-bottom: 1px solid #000 !important;
+        color: #000 !important;
+        font-size: 9pt;
+    }
+
+    .receipt-items td {
+        color: #000 !important;
+        padding: 3px 2px;
+    }
+
+    .receipt-total-row {
+        font-size: 13pt;
+        color: #000 !important;
+        font-weight: bold;
+    }
+
+    .receipt-footer-msg {
+        color: #555 !important;
+        font-style: italic;
+        font-size: 9pt;
+    }
+
+    /* Hide print & close buttons */
+    .receipt-actions {
+        display: none !important;
+    }
+
+    /* Page settings */
+    @page {
+        size: 80mm auto;   /* Thermal receipt width */
+        margin: 8mm;
+    }
+}

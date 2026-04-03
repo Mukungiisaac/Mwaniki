@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Mwaniki Furnitures - Point of Sale System for managing products, sales, and inventory">
+    <title>Mwaniki Furnitures | POS System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/print.css" media="print">
+</head>
+<body>
+
+    <!-- ── Header ─────────────────────────────────────────────────── -->
+    <header id="app-header">
+        <div class="header-inner">
+            <div class="brand">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                        <polyline points="9 22 9 12 15 12 15 22"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1>Mwaniki Furnitures</h1>
+                    <span class="tagline">Point of Sale System</span>
+                </div>
+            </div>
+            <div class="header-stats" id="header-stats">
+                <div class="stat-pill">
+                    <span class="stat-label">Products</span>
+                    <span class="stat-value" id="stat-products">0</span>
+                </div>
+                <div class="stat-pill">
+                    <span class="stat-label">Cart</span>
+                    <span class="stat-value" id="stat-cart">0</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ── Navigation Tabs ────────────────────────────────────────── -->
+    <nav id="main-nav">
+        <div class="nav-inner">
+            <button class="nav-tab active" data-tab="pos" id="nav-pos">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                <span>POS Terminal</span>
+            </button>
+            <button class="nav-tab" data-tab="products" id="nav-products">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                <span>Products</span>
+            </button>
+            <button class="nav-tab" data-tab="sales" id="nav-sales">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                <span>Sales History</span>
+            </button>
+        </div>
+    </nav>
+
+    <main id="app-main">
+
+        <!-- ══════════════════════════════════════════════════════════ -->
+        <!-- POS TERMINAL TAB                                          -->
+        <!-- ══════════════════════════════════════════════════════════ -->
+        <section class="tab-content active" id="tab-pos">
+            <div class="pos-layout">
+
+                <!-- Left: Product Grid -->
+                <div class="pos-products-panel">
+                    <div class="panel-header">
+                        <h2>Select Products</h2>
+                        <div class="search-box" id="pos-search-box">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <input type="text" id="pos-search" placeholder="Search furniture...">
+                        </div>
+                    </div>
+
+                    <!-- Category Filter Pills -->
+                    <div class="category-filters" id="category-filters">
+                        <button class="cat-pill active" data-category="all">All</button>
+                    </div>
+
+                    <!-- Product Grid -->
+                    <div class="pos-grid" id="pos-product-grid">
+                        <!-- Products loaded dynamically -->
+                    </div>
+
+                    <div class="empty-state" id="pos-empty" style="display:none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                        <p>No products available</p>
+                        <span>Add products in the Products tab to get started</span>
+                    </div>
+                </div>
+
+                <!-- Right: Cart -->
+                <div class="cart-panel">
+                    <div class="panel-header">
+                        <h2>Shopping Cart</h2>
+                        <button class="btn-clear-cart" id="btn-clear-cart" title="Clear cart">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            Clear
+                        </button>
+                    </div>
+
+                    <div class="cart-items" id="cart-items">
+                        <div class="cart-empty" id="cart-empty">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                            <p>Cart is empty</p>
+                            <span>Click on products to add them</span>
+                        </div>
+                    </div>
+
+                    <div class="cart-footer" id="cart-footer">
+                        <!-- Payment Method Selector -->
+                        <div class="payment-method-selector" id="payment-method-selector">
+                            <label class="payment-label">Payment Method</label>
+                            <div class="payment-options">
+                                <button class="payment-opt active" id="pay-opt-cash" data-method="Cash">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
+                                    Cash
+                                </button>
+                                <button class="payment-opt" id="pay-opt-mpesa" data-method="M-Pesa">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
+                                    M-Pesa
+                                </button>
+                            </div>
+                        </div>
+                        <div class="cart-total">
+                            <span>Total</span>
+                            <span class="total-amount" id="cart-total">KSh 0.00</span>
+                        </div>
+                        <button class="btn-pay" id="btn-pay" disabled>
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+                            Pay Now
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ══════════════════════════════════════════════════════════ -->
+        <!-- PRODUCTS TAB                                              -->
+        <!-- ══════════════════════════════════════════════════════════ -->
+        <section class="tab-content" id="tab-products">
+            <div class="products-layout">
+
+                <!-- Add/Edit Product Form -->
+                <div class="product-form-card">
+                    <h2 id="form-title">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        Add New Product
+                    </h2>
+                    <form id="product-form" autocomplete="off">
+                        <input type="hidden" id="edit-product-id">
+                        <div class="form-grid">
+                            <div class="form-group">
+                                <label for="product-name">Product Name</label>
+                                <input type="text" id="product-name" placeholder="e.g. Oak Dining Table" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="product-category">Category</label>
+                                <select id="product-category" required>
+                                    <option value="">Select category</option>
+                                    <option value="Tables">Tables</option>
+                                    <option value="Chairs">Chairs</option>
+                                    <option value="Beds">Beds</option>
+                                    <option value="Sofas">Sofas</option>
+                                    <option value="Cabinets">Cabinets</option>
+                                    <option value="Desks">Desks</option>
+                                    <option value="Shelves">Shelves</option>
+                                    <option value="Wardrobes">Wardrobes</option>
+                                    <option value="Other">Other</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="product-price">Price (KSh)</label>
+                                <input type="number" id="product-price" placeholder="0.00" min="0" step="0.01" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="product-stock">Stock Quantity</label>
+                                <input type="number" id="product-stock" placeholder="0" min="0" required>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary" id="btn-save-product">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                Save Product
+                            </button>
+                            <button type="button" class="btn-secondary" id="btn-cancel-edit" style="display:none;">Cancel</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Products Table -->
+                <div class="products-table-card">
+                    <div class="panel-header">
+                        <h2>All Products</h2>
+                        <div class="search-box">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <input type="text" id="product-table-search" placeholder="Search products...">
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table id="products-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Name</th>
+                                    <th>Category</th>
+                                    <th>Price (KSh)</th>
+                                    <th>Stock</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="products-table-body">
+                                <!-- Rows loaded dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="empty-state" id="products-empty" style="display:none;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                        <p>No products yet</p>
+                        <span>Use the form above to add your first product</span>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <!-- ══════════════════════════════════════════════════════════ -->
+        <!-- SALES HISTORY & ANALYTICS TAB                            -->
+        <!-- ══════════════════════════════════════════════════════════ -->
+        <section class="tab-content" id="tab-sales">
+
+            <!-- ── Analytics KPI Cards ──────────────────────────── -->
+            <div class="kpi-row" id="kpi-row">
+                <div class="kpi-card">
+                    <div class="kpi-icon kpi-revenue">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    </div>
+                    <div class="kpi-info">
+                        <span class="kpi-label">Total Revenue</span>
+                        <span class="kpi-value" id="kpi-revenue">KSh 0.00</span>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-icon kpi-sales">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    </div>
+                    <div class="kpi-info">
+                        <span class="kpi-label">Total Sales</span>
+                        <span class="kpi-value" id="kpi-sales">0</span>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-icon kpi-cash">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/></svg>
+                    </div>
+                    <div class="kpi-info">
+                        <span class="kpi-label">Cash Sales</span>
+                        <span class="kpi-value" id="kpi-cash">0</span>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-icon kpi-mpesa">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12" y2="18"/></svg>
+                    </div>
+                    <div class="kpi-info">
+                        <span class="kpi-label">M-Pesa Sales</span>
+                        <span class="kpi-value" id="kpi-mpesa">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Charts Row ────────────────────────────────────── -->
+            <div class="charts-row">
+                <div class="chart-card">
+                    <div class="chart-card-header">
+                        <h3>Daily Revenue (Last 30 Days)</h3>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-daily"></canvas>
+                    </div>
+                    <div class="empty-state chart-empty" id="chart-daily-empty" style="display:none;">
+                        <p>No sales data yet</p>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <div class="chart-card-header">
+                        <h3>Top Selling Products</h3>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="chart-products"></canvas>
+                    </div>
+                    <div class="empty-state chart-empty" id="chart-products-empty" style="display:none;">
+                        <p>No products sold yet</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Sales Table ───────────────────────────────────── -->
+            <div class="sales-table-card">
+                <div class="panel-header">
+                    <h2>Transaction History</h2>
+                    <button class="btn-refresh" id="btn-refresh-sales" title="Refresh">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                        Refresh
+                    </button>
+                </div>
+
+                <!-- Search & Filter Bar -->
+                <div class="sales-filters">
+                    <div class="search-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="text" id="sales-search" placeholder="Search by ID or date...">
+                    </div>
+                    <select id="sales-filter-payment" class="filter-select">
+                        <option value="">All Payment Methods</option>
+                        <option value="Cash">Cash</option>
+                        <option value="M-Pesa">M-Pesa</option>
+                    </select>
+                    <input type="date" id="sales-filter-date" class="filter-date" title="Filter by date">
+                    <button class="btn-secondary btn-sm" id="btn-clear-filters">Clear</button>
+                </div>
+
+                <div class="table-wrapper">
+                    <table id="sales-table">
+                        <thead>
+                            <tr>
+                                <th>Sale ID</th>
+                                <th>Date & Time</th>
+                                <th>Items</th>
+                                <th>Payment</th>
+                                <th>Total</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sales-table-body">
+                            <!-- Rows loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty-state" id="sales-empty" style="display:none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    <p>No sales recorded</p>
+                    <span>Complete a sale from the POS Terminal to see history</span>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <!-- ── Toast Notification Container ───────────────────────────── -->
+    <div id="toast-container"></div>
+
+    <!-- ── Receipt / Sale Modal ─────────────────────────────────── -->
+    <div class="modal-overlay" id="modal-overlay">
+        <div class="modal receipt-modal" id="sale-modal">
+            <div class="receipt-screen-header">
+                <div class="modal-icon success">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <h3>Sale Complete!</h3>
+                <p id="modal-sale-info"></p>
+            </div>
+            <div class="receipt-body" id="receipt-body">
+                <div class="receipt-header">
+                    <div class="receipt-logo">🪑</div>
+                    <div class="receipt-shop-name">Mwaniki Furnitures</div>
+                    <div class="receipt-shop-sub">Point of Sale System</div>
+                    <div class="receipt-divider">- - - - - - - - - - - - - - - - -</div>
+                    <div class="receipt-meta">
+                        <div><span>Receipt #</span><span id="r-sale-id"></span></div>
+                        <div><span>Date:</span><span id="r-date"></span></div>
+                        <div><span>Payment:</span><span id="r-payment"></span></div>
+                    </div>
+                    <div class="receipt-divider">- - - - - - - - - - - - - - - - -</div>
+                </div>
+                <table class="receipt-items">
+                    <thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Sub</th></tr></thead>
+                    <tbody id="r-items-body"></tbody>
+                </table>
+                <div class="receipt-divider">- - - - - - - - - - - - - - - - -</div>
+                <div class="receipt-total-row"><span>TOTAL</span><span id="r-total"></span></div>
+                <div class="receipt-divider">- - - - - - - - - - - - - - - - -</div>
+                <div class="receipt-footer-msg">Thank you for shopping with us!</div>
+            </div>
+            <div class="receipt-actions">
+                <button class="btn-secondary" id="btn-modal-close">Close</button>
+                <button class="btn-print" id="btn-print-receipt">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                    Print Receipt
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Sale Detail Modal (History View) ──────────────────────── -->
+    <div class="modal-overlay" id="detail-modal-overlay">
+        <div class="modal detail-modal" id="detail-modal">
+            <div class="detail-modal-header">
+                <div>
+                    <h3 id="detail-title">Sale Details</h3>
+                    <p id="detail-subtitle" style="font-size:0.8rem;color:var(--text-muted);margin-top:0.2rem;"></p>
+                </div>
+                <button class="btn-icon-close" id="btn-detail-close">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+            <div class="detail-meta-row" id="detail-meta"></div>
+            <div class="table-wrapper">
+                <table id="detail-items-table">
+                    <thead>
+                        <tr><th>Product</th><th>Category</th><th>Qty</th><th>Unit Price</th><th>Subtotal</th></tr>
+                    </thead>
+                    <tbody id="detail-items-body"></tbody>
+                </table>
+            </div>
+            <div class="detail-total-row">
+                <span>Grand Total</span>
+                <span id="detail-total" class="detail-grand-total"></span>
+            </div>
+            <div class="receipt-actions" style="padding:0.8rem 0 0;">
+                <button class="btn-secondary" id="btn-detail-close2">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Quantity Input Modal ────────────────────────────────────── -->
+    <div class="modal-overlay" id="qty-modal-overlay">
+        <div class="modal qty-modal" id="qty-modal">
+            <h3 id="qty-modal-title">Enter Quantity</h3>
+            <p id="qty-modal-info"></p>
+            <div class="qty-input-group">
+                <button class="qty-btn" id="qty-minus">−</button>
+                <input type="number" id="qty-input" value="1" min="1">
+                <button class="qty-btn" id="qty-plus">+</button>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-secondary" id="qty-cancel">Cancel</button>
+                <button class="btn-primary" id="qty-confirm">Add to Cart</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chart.js via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
