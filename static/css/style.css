@@ -208,11 +208,11 @@ a{color:var(--primary-400);text-decoration:none}
 
 /* TABLE */
 .table-wrapper{overflow-x:auto}
-#products-table{width:100%;border-collapse:collapse;font-size:0.85rem}
-#products-table thead th{text-align:left;padding:0.7rem 1rem;font-weight:600;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);border-bottom:1px solid var(--border-medium);white-space:nowrap}
-#products-table tbody tr{transition:background var(--transition-fast)}
-#products-table tbody tr:hover{background:var(--bg-hover)}
-#products-table tbody td{padding:0.7rem 1rem;border-bottom:1px solid var(--border-subtle);white-space:nowrap}
+#products-table, #users-table {width:100%;border-collapse:collapse;font-size:0.85rem}
+#products-table thead th, #users-table thead th {text-align:left;padding:0.7rem 1rem;font-weight:600;font-size:0.75rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);border-bottom:1px solid var(--border-medium);white-space:nowrap}
+#products-table tbody tr, #users-table tbody tr {transition:background var(--transition-fast)}
+#products-table tbody tr:hover, #users-table tbody tr:hover {background:var(--bg-hover)}
+#products-table tbody td, #users-table tbody td {padding:0.7rem 1rem;border-bottom:1px solid var(--border-subtle);white-space:nowrap}
 .stock-badge{display:inline-block;padding:0.15rem 0.55rem;border-radius:var(--radius-full);font-size:0.75rem;font-weight:600}
 .stock-badge.in-stock{background:var(--success-bg);color:var(--success)}
 .stock-badge.low-stock{background:rgba(255,167,38,0.12);color:var(--warning)}
