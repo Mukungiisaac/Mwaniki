@@ -90,6 +90,8 @@ def init_db():
         cursor.execute("ALTER TABLE users ADD COLUMN id_number TEXT NOT NULL DEFAULT ''")
     except Exception:
         pass
+
+    try:
         cursor.execute("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'")
     except Exception:
         pass
