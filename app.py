@@ -607,6 +607,7 @@ def delete_user(user_id):
     conn.commit()
     conn.close()
     return jsonify({'message': 'User deleted successfully'})
+   
 
 
 # ─── Application Entry Point ───────────────────────────────────────────────────
