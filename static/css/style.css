@@ -893,3 +893,76 @@ a{color:var(--primary-400);text-decoration:none}
 @media(max-width: 480px) {
     .kpi-row { grid-template-columns: 1fr; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   AVATARS & PHOTO UPLOADS
+   ══════════════════════════════════════════════════════════════════════════ */
+.avatar {
+    border-radius: 50%;
+    object-fit: cover;
+    background-color: var(--bg-hover);
+    border: 2px solid var(--border-medium);
+}
+.avatar-xs { width: 24px; height: 24px; border-width: 1px; }
+.avatar-sm { width: 32px; height: 32px; border-width: 1px; }
+.avatar-lg { width: 64px; height: 64px; }
+.avatar-xl { width: 80px; height: 80px; }
+
+.photo-upload-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+}
+.photo-upload-preview {
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+}
+.photo-upload-preview img {
+    display: block;
+    width: 64px;
+    height: 64px;
+    min-width: 64px;
+    min-height: 64px;
+    border-radius: 50%;
+    object-fit: cover;
+    background-color: var(--bg-hover);
+    border: 2px solid var(--primary-500);
+    transition: filter var(--transition-fast);
+}
+.photo-upload-preview:hover img {
+    filter: brightness(0.8);
+}
+.photo-upload-btn-overlay {
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    width: 24px;
+    height: 24px;
+    background: var(--primary-500);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-inverse);
+    border: 2px solid var(--bg-card);
+    transition: transform var(--transition-fast);
+}
+.photo-upload-preview:hover .photo-upload-btn-overlay {
+    transform: scale(1.1);
+}
+.photo-upload-btn-overlay svg { width: 12px; height: 12px; }
+
+.file-input-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    border: 0;
+}

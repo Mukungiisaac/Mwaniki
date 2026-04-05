@@ -11,9 +11,15 @@ from functools import wraps
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
+import werkzeug.utils
+
 app = Flask(__name__)
 app.secret_key = 'mwaniki-furnitures-secret-key-12345' # In production, use environment variable
 DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'mwaniki_pos.db')
+
+UPLOAD_FOLDER = os.path.join(app.root_path, 'static', 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 
 
@@ -93,6 +99,11 @@ def init_db():
 
     try:
         cursor.execute("ALTER TABLE users ADD COLUMN status TEXT NOT NULL DEFAULT 'active'")
+    except Exception:
+        pass
+
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN photo TEXT NOT NULL DEFAULT 'default.png'")
     except Exception:
         pass
 
@@ -182,7 +193,16 @@ def logout():
 @login_required
 def index():
     """Serve the main POS interface."""
-    return render_template('index.html', user={'username': session['username'], 'role': session['user_role']})
+    conn = get_db()
+    user_row = conn.execute('SELECT photo FROM users WHERE id = ?', (session['user_id'],)).fetchone()
+    conn.close()
+    photo = user_row['photo'] if user_row and 'photo' in user_row.keys() and user_row['photo'] else 'default.png'
+    
+    return render_template('index.html', user={
+        'username': session['username'], 
+        'role': session['user_role'],
+        'photo': photo
+    })
 
 
 
@@ -469,7 +489,7 @@ def get_analytics():
 def get_profile():
     """Fetch logged in user profile."""
     conn = get_db()
-    user = conn.execute('SELECT id, username, role, phone, id_number FROM users WHERE id = ?', (session['user_id'],)).fetchone()
+    user = conn.execute('SELECT id, username, role, phone, id_number, photo FROM users WHERE id = ?', (session['user_id'],)).fetchone()
     conn.close()
     if not user:
         return jsonify({'error': 'User not found'}), 404
@@ -480,15 +500,29 @@ def get_profile():
 @login_required
 def update_profile():
     """Update logged in user profile."""
-    data = request.get_json()
+    data = request.form
     phone = data.get('phone', '')
     id_number = data.get('id_number', '')
     
+    filename = None
+    if 'photo' in request.files:
+        photo = request.files['photo']
+        if photo.filename != '':
+            filename = werkzeug.utils.secure_filename(photo.filename)
+            filename = f"user_{session['user_id']}_{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}"
+            photo.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    
     conn = get_db()
-    conn.execute(
-        'UPDATE users SET phone = ?, id_number = ? WHERE id = ?',
-        (phone, id_number, session['user_id'])
-    )
+    if filename:
+        conn.execute(
+            'UPDATE users SET phone = ?, id_number = ?, photo = ? WHERE id = ?',
+            (phone, id_number, filename, session['user_id'])
+        )
+    else:
+        conn.execute(
+            'UPDATE users SET phone = ?, id_number = ? WHERE id = ?',
+            (phone, id_number, session['user_id'])
+        )
     conn.commit()
     conn.close()
     return jsonify({'message': 'Profile updated successfully'})
@@ -502,7 +536,7 @@ def update_profile():
 def get_users():
     """Fetch all users."""
     conn = get_db()
-    users = conn.execute('SELECT id, username, role, status, phone, id_number FROM users').fetchall()
+    users = conn.execute('SELECT id, username, role, status, phone, id_number, photo FROM users').fetchall()
     conn.close()
     return jsonify([dict(u) for u in users])
 
@@ -512,17 +546,25 @@ def get_users():
 @role_required('admin')
 def add_user():
     """Add a new user."""
-    data = request.get_json()
+    data = request.form
     if not all(k in data for k in ('username', 'password', 'role', 'phone', 'id_number')):
         return jsonify({'error': 'Missing required fields. Phone and ID Number are required.'}), 400
 
     hashed_password = generate_password_hash(data['password'])
     
+    filename = 'default.png'
+    if 'photo' in request.files:
+        photo = request.files['photo']
+        if photo.filename != '':
+            filename = werkzeug.utils.secure_filename(photo.filename)
+            filename = f"newuser_{datetime.now().strftime('%Y%m%d%H%M%S')}_{filename}"
+            photo.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+    
     conn = get_db()
     try:
         conn.execute(
-            'INSERT INTO users (username, password, role, phone, id_number) VALUES (?, ?, ?, ?, ?)',
-            (data['username'], hashed_password, data['role'], data['phone'], data['id_number'])
+            'INSERT INTO users (username, password, role, phone, id_number, photo) VALUES (?, ?, ?, ?, ?, ?)',
+            (data['username'], hashed_password, data['role'], data['phone'], data['id_number'], filename)
         )
         conn.commit()
     except sqlite3.IntegrityError:

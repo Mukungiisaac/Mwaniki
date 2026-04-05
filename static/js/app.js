@@ -797,8 +797,7 @@ async function saveUser(data) {
     try {
         const res = await fetch('/api/users', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
+            body: data
         });
         const result = await res.json();
         if (!res.ok) throw new Error(result.error);
@@ -846,13 +845,18 @@ async function updateUserStatus(id, status) {
 function initUserForm() {
     $('#user-form')?.addEventListener('submit', (e) => {
         e.preventDefault();
-        const data = {
-            username: $('#user-username').value.trim(),
-            password: $('#user-password').value,
-            role: $('#user-role').value,
-            phone: $('#user-phone').value.trim(),
-            id_number: $('#user-id-number').value.trim()
-        };
+        const data = new FormData();
+        data.append('username', $('#user-username').value.trim());
+        data.append('password', $('#user-password').value);
+        data.append('role', $('#user-role').value);
+        data.append('phone', $('#user-phone').value.trim());
+        data.append('id_number', $('#user-id-number').value.trim());
+        
+        const fileInput = $('#user-photo');
+        if (fileInput && fileInput.files[0]) {
+            data.append('photo', fileInput.files[0]);
+        }
+        
         saveUser(data);
     });
 }
@@ -893,6 +897,7 @@ function loadUsersTable() {
         return `
             <tr>
                 <td>#${u.id}</td>
+                <td><img src="/static/uploads/${u.photo || 'default.png'}" class="avatar avatar-sm" onerror="this.src='/static/uploads/default.png'"></td>
                 <td><strong>${escHtml(u.username)}</strong></td>
                 <td>${escHtml(u.phone || '-')}</td>
                 <td>${escHtml(u.id_number || '-')}</td>
@@ -914,6 +919,10 @@ function initProfileModal() {
             if(!res.ok) throw new Error(data.error);
             $('#profile-phone').value = data.phone || '';
             $('#profile-id-number').value = data.id_number || '';
+            
+            if ($('#profile-photo-preview')) {
+                $('#profile-photo-preview').src = data.photo ? `/static/uploads/${data.photo}` : '/static/uploads/default.png';
+            }
             $('#profile-modal-overlay').classList.add('visible');
         } catch(err) {
             showToast(err.message || 'Failed to load profile', 'error');
@@ -926,18 +935,34 @@ function initProfileModal() {
 
     $('#profile-form')?.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const phone = $('#profile-phone').value.trim();
-        const id_number = $('#profile-id-number').value.trim();
+        const data = new FormData();
+        data.append('phone', $('#profile-phone').value.trim());
+        data.append('id_number', $('#profile-id-number').value.trim());
+        
+        const photoFile = $('#profile-photo').files[0];
+        if (photoFile) {
+            data.append('photo', photoFile);
+        }
+
         try {
             const res = await fetch('/api/users/profile', {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ phone, id_number })
+                body: data
             });
             const result = await res.json();
             if(!res.ok) throw new Error(result.error);
             showToast(result.message);
             $('#profile-modal-overlay').classList.remove('visible');
+            
+            // update header instantly
+            if (photoFile) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const headerImg = $('#header-avatar');
+                    if(headerImg) headerImg.src = e.target.result;
+                }
+                reader.readAsDataURL(photoFile);
+            }
             
             // If they are an admin and currently on the users tab, refresh the table so they see their own updates
             if (window.USER?.role === 'admin' && $('.nav-tab.active')?.dataset.tab === 'users') {

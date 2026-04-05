@@ -40,6 +40,7 @@
             </div>
 
             <div class="header-user">
+                <img src="/static/uploads/{{ user.photo }}" alt="Avatar" class="avatar avatar-sm" id="header-avatar" onerror="this.src='/static/uploads/default.png'">
                 <div class="user-info">
                     <span class="user-role">{{ user.role }}</span>
                     <span class="user-name">{{ user.username }}</span>
@@ -387,6 +388,19 @@
                     </h2>
                     <form id="user-form" autocomplete="off">
                         <div class="form-grid user-form-grid">
+                            <div class="form-group" style="grid-column: 1 / -1;">
+                                <label>Profile Photo</label>
+                                <div class="photo-upload-wrapper">
+                                    <div class="photo-upload-preview" onclick="document.getElementById('user-photo').click()">
+                                        <img src="/static/uploads/default.png" id="user-photo-preview" alt="Preview">
+                                        <div class="photo-upload-btn-overlay">
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                                        </div>
+                                    </div>
+                                    <input type="file" id="user-photo" name="photo" class="file-input-hidden" accept="image/*" onchange="previewImage(this, 'user-photo-preview')">
+                                    <span style="font-size:0.8rem; color:var(--text-muted)">Optional</span>
+                                </div>
+                            </div>
                             <div class="form-group">
                                 <label for="user-username">Username</label>
                                 <input type="text" id="user-username" placeholder="Mwaniki" required autocomplete="off">
@@ -439,6 +453,7 @@
                             <thead>
                                 <tr>
                                     <th>ID</th>
+                                    <th>Photo</th>
                                     <th>Username</th>
                                     <th>Phone</th>
                                     <th>ID No.</th>
@@ -542,6 +557,18 @@
             <p>Update your contact and identification details</p>
             <form id="profile-form">
                 <div class="form-group" style="margin-bottom:1rem; text-align:left;">
+                    <label>Profile Photo</label>
+                    <div class="photo-upload-wrapper">
+                        <div class="photo-upload-preview" onclick="document.getElementById('profile-photo').click()">
+                            <img src="/static/uploads/default.png" id="profile-photo-preview" alt="Preview">
+                            <div class="photo-upload-btn-overlay">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+                            </div>
+                        </div>
+                        <input type="file" id="profile-photo" name="photo" class="file-input-hidden" accept="image/*" onchange="previewImage(this, 'profile-photo-preview')">
+                    </div>
+                </div>
+                <div class="form-group" style="margin-bottom:1rem; text-align:left;">
                     <label for="profile-phone">Phone Number</label>
                     <input type="tel" id="profile-phone" placeholder="0712345678" required>
                 </div>
@@ -579,8 +606,18 @@
     <script>
         window.USER = {
             username: "{{ user.username }}",
-            role: "{{ user.role }}"
+            role: "{{ user.role }}",
+            photo: "{{ user.photo }}"
         };
+        function previewImage(input, previewId) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById(previewId).src = e.target.result;
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
     </script>
     <script src="/static/js/app.js"></script>
 </body>
