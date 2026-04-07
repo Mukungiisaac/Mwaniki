@@ -53,7 +53,7 @@ html {
     scroll-behavior: smooth;
     -webkit-font-smoothing: antialiased;
     height: 100%;
-    overflow: hidden;
+    overflow-x: hidden;
 }
 
 body {
@@ -61,18 +61,17 @@ body {
     background: var(--bg-body);
     color: var(--text-primary);
     line-height: 1.6;
-    height: 100%;
-    overflow: hidden;
+    min-height: 100vh;
+    overflow-x: hidden;
 }
 
 #app-container {
     display: flex;
     flex-direction: column;
-    height: 100vh;
-    height: 100dvh;
-    overflow: hidden;
+    min-height: 100vh;
     width: 100%;
 }
+
 
 
 body::before {
@@ -120,12 +119,17 @@ a {
 
 /* HEADER */
 #app-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
     flex-shrink: 0;
     z-index: 100;
-    background: rgba(15, 17, 23, 0.85);
+    background: rgba(15, 17, 23, 0.92);
     backdrop-filter: blur(20px) saturate(1.4);
-    border-bottom: 1px solid var(--border-subtle)
+    border-bottom: 1px solid var(--border-subtle);
 }
+
 
 
 .header-inner {
@@ -261,34 +265,54 @@ a {
 }
 
 
-/* NAV */
+/* NAV (Global Drawer) */
 #main-nav {
-    flex-shrink: 0;
-    z-index: 99;
-    background: rgba(15, 17, 23, 0.75);
+    position: fixed;
+    top: 65px; /* Below the fixed header */
+    bottom: 0;
+    left: 0;
+    right: 0; /* Full screen overlay */
+    background: rgba(15, 17, 23, 0.98);
     backdrop-filter: blur(16px);
-    border-bottom: 1px solid var(--border-subtle)
+    z-index: 98;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    padding: 0;
+    border-right: 1px solid var(--border-subtle);
 }
 
+#main-nav.open {
+    transform: translateX(0);
+}
 
 .nav-inner {
-    max-width: 1440px;
-    margin: 0 auto;
-    padding: 0 1.5rem;
-    display: flex;
-    gap: 0.25rem
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+    white-space: normal;
+    padding: 1.5rem 1rem;
+    height: 100%;
+    gap: 0.8rem;
+    max-width: 400px;
+    margin: 0;
 }
 
 .nav-tab {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.85rem 1.2rem;
     font-size: 0.85rem;
     font-weight: 500;
     color: var(--text-muted);
-    border-bottom: 2px solid transparent;
-    transition: all var(--transition-fast)
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+    width: 100%;
+    justify-content: flex-start;
+    padding: 0.75rem 1rem;
+    border-bottom: none;
+    border-left: 3px solid transparent;
+    border-radius: 4px;
+    background: rgba(255,255,255,0.02);
 }
 
 .nav-tab svg {
@@ -304,7 +328,9 @@ a {
 
 .nav-tab.active {
     color: var(--primary-400);
-    border-bottom-color: var(--primary-500)
+    border-bottom-color: transparent;
+    border-left-color: var(--primary-500);
+    background: rgba(255, 193, 7, 0.05);
 }
 
 .nav-tab.active svg {
@@ -320,26 +346,22 @@ a {
 }
 
 .nav-tab.admin-only.active {
-    border-bottom-color: var(--accent-400);
+    border-left-color: var(--accent-400);
 }
 
 
 /* MAIN */
 #app-main {
     flex: 1;
-    overflow-y: auto;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
     max-width: 1440px;
     margin: 0 auto;
     padding: 1.5rem;
+    padding-top: 85px; /* Adjusted for global header (drawer is togglable) */
     position: relative;
     z-index: 1;
     width: 100%;
 }
-#app-main::-webkit-scrollbar {
-    width: 4px;
-}
+
 
 
 .tab-content {
@@ -2309,17 +2331,7 @@ a {
 #app-footer {
     background: var(--bg-surface);
     border-top: 1px solid var(--border-subtle);
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 100;
-    transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
-    transform: translateY(calc(100% - 12px));
-}
-
-#app-footer:hover {
-    transform: translateY(0);
+    margin-top: auto;
 }
 
 #app-footer::before {
@@ -2425,14 +2437,33 @@ a {
     color: var(--text-muted);
 }
 
-@media(max-width: 768px) {
-    #app-footer {
-        flex-shrink: 0;
-        transform: none !important;
-        margin-top: 0;
-        transition: none;
+.mobile-only {
+    display: none !important;
+}
+
+@media(max-width: 1024px) {
+    .desktop-only {
+        display: none !important;
     }
-    #app-footer:hover { transform: none !important; }
+    .mobile-only {
+        display: flex !important;
+    }
+    .header-stats {
+        display: none !important;
+    }
+    #app-header {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+    }
+    /* #main-nav styling is now globally handled as a drawer */
+
+    #app-footer {
+        position: relative;
+        margin-top: auto;
+    }
+
     #app-footer::before { display: none; }
 
     .footer-inner {
@@ -2440,7 +2471,6 @@ a {
     }
 
     .footer-content {
-
         flex-direction: column;
         gap: 1.5rem;
     }

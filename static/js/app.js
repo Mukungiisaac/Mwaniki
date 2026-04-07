@@ -42,6 +42,12 @@ function initTabs() {
             $$('.tab-content').forEach(tc => tc.classList.remove('active'));
             tab.classList.add('active');
             $(`#tab-${tab.dataset.tab}`).classList.add('active');
+            
+            // Close mobile menu if open
+            if ($('#main-nav')) {
+                $('#main-nav').classList.remove('open');
+            }
+
             // Refresh data when switching tabs
             if (tab.dataset.tab === 'products') loadProductsTable();
             if (tab.dataset.tab === 'sales') loadSalesHistory();
@@ -1048,6 +1054,17 @@ function initPasswordToggles() {
 }
 
 
+// ─── Mobile Menu ───────────────────────────────────────────────────────────────
+function initMobileMenu() {
+    $('#btn-main-menu')?.addEventListener('click', () => {
+        $('#main-nav')?.classList.toggle('open');
+    });
+    $('#btn-my-profile-mobile')?.addEventListener('click', () => {
+        $('#main-nav')?.classList.remove('open');
+        $('#btn-my-profile')?.click();
+    });
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1065,8 +1082,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initPasswordToggles();
     initPaymentMethod();
     initProfileModal();
-
-
+    initMobileMenu();
     $('#btn-pay').addEventListener('click', processSale);
     $('#btn-clear-cart').addEventListener('click', clearCart);
 
