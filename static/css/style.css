@@ -786,15 +786,10 @@ a {
 
 /* PRODUCTS & USERS LAYOUT */
 .products-layout {
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
-}
-
-@media(max-width: 1024px) {
-    .product-form-card {
-        max-width: 100%;
-    }
+    display: grid;
+    grid-template-columns: 320px minmax(0, 1fr);
+    gap: 1.5rem;
+    align-items: start;
 }
 
 .product-form-card {
@@ -802,9 +797,7 @@ a {
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg);
     padding: 1.5rem;
-    max-width: 600px;
     width: 100%;
-    margin: 0 auto;
 }
 
 .products-table-card {
@@ -815,6 +808,18 @@ a {
     width: 100%;
     min-width: 0;
     overflow: hidden;
+}
+
+@media(max-width: 1024px) {
+    .products-layout {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+    }
+    .product-form-card {
+        max-width: 600px;
+        margin: 0 auto;
+    }
 }
 
 .product-form-card h2,
