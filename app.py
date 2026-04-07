@@ -107,6 +107,23 @@ def init_db():
     except Exception:
         pass
 
+    try:
+        cursor.execute("ALTER TABLE products ADD COLUMN cost_price REAL NOT NULL DEFAULT 0")
+    except Exception:
+        pass
+
+    try:
+        cursor.execute("ALTER TABLE sales ADD COLUMN total_profit REAL NOT NULL DEFAULT 0")
+    except Exception:
+        pass
+
+    try:
+        cursor.execute("ALTER TABLE sale_items ADD COLUMN cost_price REAL NOT NULL DEFAULT 0")
+        cursor.execute("ALTER TABLE sale_items ADD COLUMN profit_per_item REAL NOT NULL DEFAULT 0")
+        cursor.execute("ALTER TABLE sale_items ADD COLUMN total_profit REAL NOT NULL DEFAULT 0")
+    except Exception:
+        pass
+
     # Create default admin if no users exist
     cursor.execute('SELECT COUNT(*) FROM users')
     if cursor.fetchone()[0] == 0:
@@ -229,14 +246,14 @@ def add_product():
     data = request.get_json()
 
     # Validate required fields
-    if not all(k in data for k in ('name', 'category', 'price', 'stock')):
+    if not all(k in data for k in ('name', 'category', 'price', 'cost_price', 'stock')):
         return jsonify({'error': 'Missing required fields'}), 400
 
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
-        'INSERT INTO products (name, category, price, stock) VALUES (?, ?, ?, ?)',
-        (data['name'], data['category'], float(data['price']), int(data['stock']))
+        'INSERT INTO products (name, category, price, cost_price, stock) VALUES (?, ?, ?, ?, ?)',
+        (data['name'], data['category'], float(data['price']), float(data['cost_price']), int(data['stock']))
     )
     conn.commit()
     product_id = cursor.lastrowid
@@ -261,8 +278,8 @@ def update_product(product_id):
         return jsonify({'error': 'Product not found'}), 404
 
     conn.execute(
-        'UPDATE products SET name = ?, category = ?, price = ?, stock = ? WHERE id = ?',
-        (data['name'], data['category'], float(data['price']), int(data['stock']), product_id)
+        'UPDATE products SET name = ?, category = ?, price = ?, cost_price = ?, stock = ? WHERE id = ?',
+        (data['name'], data['category'], float(data['price']), float(data['cost_price']), int(data['stock']), product_id)
     )
     conn.commit()
     conn.close()
@@ -341,22 +358,34 @@ def process_sale():
         # Insert the sale record with payment method
         sale_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         cursor.execute(
-            'INSERT INTO sales (total_amount, payment_method, date) VALUES (?, ?, ?)',
-            (total_amount, payment_method, sale_date)
+            'INSERT INTO sales (total_amount, payment_method, date, total_profit) VALUES (?, ?, ?, ?)',
+            (total_amount, payment_method, sale_date, 0)
         )
         sale_id = cursor.lastrowid
 
+        sale_total_profit = 0
+
         # Insert each sale item and reduce stock
         for item in items:
+            product = conn.execute(
+                'SELECT cost_price FROM products WHERE id = ?', (item['product_id'],)
+            ).fetchone()
+            cost_price = product['cost_price'] if product and 'cost_price' in product.keys() else 0
+            profit_per_item = float(item['price']) - cost_price
+            item_total_profit = profit_per_item * int(item['quantity'])
+            sale_total_profit += item_total_profit
+
             cursor.execute(
-                'INSERT INTO sale_items (sale_id, product_id, quantity, price) VALUES (?, ?, ?, ?)',
-                (sale_id, item['product_id'], item['quantity'], item['price'])
+                'INSERT INTO sale_items (sale_id, product_id, quantity, price, cost_price, profit_per_item, total_profit) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                (sale_id, item['product_id'], item['quantity'], item['price'], cost_price, profit_per_item, item_total_profit)
             )
             # Reduce stock
             cursor.execute(
                 'UPDATE products SET stock = stock - ? WHERE id = ?',
                 (item['quantity'], item['product_id'])
             )
+
+        cursor.execute('UPDATE sales SET total_profit = ? WHERE id = ?', (sale_total_profit, sale_id))
 
         conn.commit()
         return jsonify({
@@ -441,12 +470,12 @@ def get_analytics():
 
     # Total revenue and sales count
     summary = conn.execute(
-        'SELECT COALESCE(SUM(total_amount), 0) as revenue, COUNT(*) as count FROM sales'
+        'SELECT COALESCE(SUM(total_amount), 0) as revenue, COALESCE(SUM(total_profit), 0) as total_profit, COUNT(*) as count FROM sales'
     ).fetchone()
 
     # Best-selling products (top 5 by total quantity sold)
     best_sellers = conn.execute('''
-        SELECT p.name, SUM(si.quantity) as total_qty, SUM(si.quantity * si.price) as total_revenue
+        SELECT p.name, SUM(si.quantity) as total_qty, SUM(si.quantity * si.price) as total_revenue, SUM(si.total_profit) as product_profit
         FROM sale_items si
         JOIN products p ON si.product_id = p.id
         GROUP BY p.id, p.name
@@ -458,6 +487,7 @@ def get_analytics():
     daily_sales = conn.execute('''
         SELECT DATE(date) as day,
                SUM(total_amount) as revenue,
+               SUM(total_profit) as total_profit,
                COUNT(*) as count
         FROM sales
         WHERE date >= DATE('now', '-30 days')
@@ -472,10 +502,27 @@ def get_analytics():
         GROUP BY payment_method
     ''').fetchall()
 
+    # Monthly profit current month
+    monthly_profit_row = conn.execute('''
+        SELECT COALESCE(SUM(total_profit), 0) as monthly_profit
+        FROM sales
+        WHERE strftime('%Y-%m', date) = strftime('%Y-%m', 'now')
+    ''').fetchone()
+    
+    # Daily profit today
+    daily_profit_row = conn.execute('''
+        SELECT COALESCE(SUM(total_profit), 0) as daily_profit
+        FROM sales
+        WHERE DATE(date) = DATE('now')
+    ''').fetchone()
+
     conn.close()
     return jsonify({
         'total_revenue': summary['revenue'],
+        'total_profit': summary['total_profit'],
         'total_sales': summary['count'],
+        'monthly_profit': monthly_profit_row['monthly_profit'],
+        'daily_profit': daily_profit_row['daily_profit'],
         'best_sellers': [dict(r) for r in best_sellers],
         'daily_sales': [dict(r) for r in daily_sales],
         'payment_breakdown': [dict(r) for r in payment_breakdown]

@@ -36,7 +36,14 @@
     --transition-fast: 150ms var(--ease-out);
     --transition-base: 250ms var(--ease-out);
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --profit: #10b981;
+    --loss: #ef5350;
 }
+
+.text-profit { color: var(--profit) !important; font-weight: 600; }
+.text-loss { color: var(--loss) !important; font-weight: 600; }
+.bg-profit-subtle { background: rgba(16, 185, 129, 0.1); }
+.bg-loss-subtle { background: rgba(239, 83, 80, 0.1); }
 
 *,
 *::before,
@@ -2545,7 +2552,39 @@ a {
         flex-direction: column;
         gap: 1.5rem;
     }
+/* Analytics Enhancements */
+.kpi-profit {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: var(--radius-md);
+}
 
+.profit-badge {
+    padding: 0.2rem 0.6rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: inline-block;
+}
+
+.profit-positive {
+    background: var(--success-bg);
+    color: var(--success);
+}
+
+.profit-negative {
+    background: var(--danger-bg);
+    color: var(--danger);
+}
+
+@media print {
+    .charts-row, #kpi-row-profit, .sales-filters, .btn-refresh, .action-btns, .kpi-row {
+        display: none !important;
+    }
+}
     .footer-bottom {
         flex-direction: column;
         justify-content: center;

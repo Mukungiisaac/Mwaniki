@@ -123,12 +123,18 @@ function initProductForm() {
         const data = {
             name: $('#product-name').value.trim(),
             category: $('#product-category').value,
+            cost_price: parseFloat($('#product-cost').value),
             price: parseFloat($('#product-price').value),
             stock: parseInt($('#product-stock').value)
         };
-        if (!data.name || !data.category || isNaN(data.price) || isNaN(data.stock)) {
+        if (!data.name || !data.category || isNaN(data.price) || isNaN(data.cost_price) || isNaN(data.stock)) {
             showToast('Please fill in all fields correctly', 'warning');
             return;
+        }
+        if (data.price < data.cost_price) {
+            if (!confirm('Selling price is lower than cost price. This will result in a loss. Continue?')) {
+                return;
+            }
         }
         saveProduct(data);
     });
@@ -151,6 +157,7 @@ function editProduct(id) {
     editingProductId = id;
     $('#product-name').value = product.name;
     $('#product-category').value = product.category;
+    $('#product-cost').value = product.cost_price || 0;
     $('#product-price').value = product.price;
     $('#product-stock').value = product.stock;
     $('#form-title').innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit Product`;
@@ -190,6 +197,7 @@ function loadProductsTable() {
             <td>#${p.id}</td>
             <td><strong>${escHtml(p.name)}</strong></td>
             <td>${escHtml(p.category)}</td>
+            <td>${formatPrice(p.cost_price || 0)}</td>
             <td>${formatPrice(p.price)}</td>
             <td><span class="stock-badge ${stockClass}">${stockLabel}</span></td>
             <td><div class="action-btns">
@@ -528,6 +536,22 @@ async function loadAnalytics() {
         // KPI cards
         $('#kpi-revenue').textContent = formatPrice(data.total_revenue);
         $('#kpi-sales').textContent   = data.total_sales;
+        
+        // Profit cards
+        $('#kpi-total-profit').textContent = formatPrice(data.total_profit);
+        $('#kpi-monthly-profit').textContent = formatPrice(data.monthly_profit);
+        $('#kpi-daily-profit').textContent = formatPrice(data.daily_profit);
+
+        // Apply color classes to profit cards
+        const profitCards = [
+            { el: $('#kpi-total-profit'), val: data.total_profit },
+            { el: $('#kpi-monthly-profit'), val: data.monthly_profit },
+            { el: $('#kpi-daily-profit'), val: data.daily_profit }
+        ];
+        profitCards.forEach(p => {
+            p.el.classList.remove('text-profit', 'text-loss');
+            p.el.classList.add(p.val >= 0 ? 'text-profit' : 'text-loss');
+        });
 
         // Payment breakdown
         let cashCount = 0, mpesaCount = 0;
@@ -541,9 +565,123 @@ async function loadAnalytics() {
         // Charts
         renderDailyChart(data.daily_sales);
         renderProductsChart(data.best_sellers);
+        renderProfitDailyChart(data.daily_sales);
+        renderProfitProductsChart(data.best_sellers);
     } catch (err) {
         showToast('Failed to load analytics', 'error');
     }
+}
+
+/** Render line chart — daily profit over last 30 days */
+let profitDailyChartInstance = null;
+function renderProfitDailyChart(dailySales) {
+    const canvas = $('#chart-profit-daily');
+    const emptyEl = $('#chart-profit-daily-empty');
+
+    if (!dailySales || dailySales.length === 0) {
+        canvas.style.display = 'none';
+        emptyEl.style.display = 'flex';
+        return;
+    }
+    canvas.style.display = 'block';
+    emptyEl.style.display = 'none';
+
+    const labels  = dailySales.map(d => d.day);
+    const profits = dailySales.map(d => d.total_profit);
+
+    if (profitDailyChartInstance) profitDailyChartInstance.destroy();
+
+    profitDailyChartInstance = new Chart(canvas, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Profit (KSh)',
+                data: profits,
+                borderColor: '#10b981',
+                backgroundColor: 'rgba(16,185,129,0.12)',
+                borderWidth: 2,
+                pointBackgroundColor: '#10b981',
+                pointRadius: 4,
+                tension: 0.3,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => 'Profit: KSh ' + Number(ctx.parsed.y).toLocaleString('en-KE', {minimumFractionDigits:2})
+                    }
+                }
+            },
+            scales: {
+                x: { ticks: { color: '#636b7e', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+                y: {
+                    ticks: {
+                        color: '#636b7e', font: { size: 11 },
+                        callback: v => 'KSh ' + Number(v).toLocaleString('en-KE')
+                    },
+                    grid: { color: 'rgba(255,255,255,0.04)' },
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+}
+
+/** Render bar chart — profit per product */
+let profitProductsChartInstance = null;
+function renderProfitProductsChart(bestSellers) {
+    const canvas = $('#chart-profit-products');
+    const emptyEl = $('#chart-profit-products-empty');
+
+    if (!bestSellers || bestSellers.length === 0) {
+        canvas.style.display = 'none';
+        emptyEl.style.display = 'flex';
+        return;
+    }
+    canvas.style.display = 'block';
+    emptyEl.style.display = 'none';
+
+    const labels = bestSellers.map(p => p.name);
+    const profits = bestSellers.map(p => p.product_profit);
+
+    if (profitProductsChartInstance) profitProductsChartInstance.destroy();
+
+    profitProductsChartInstance = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Profit (KSh)',
+                data: profits,
+                backgroundColor: 'rgba(16,185,129,0.75)',
+                borderColor: '#10b981',
+                borderWidth: 1.5,
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                tooltip: { callbacks: { label: ctx => 'Profit: KSh ' + Number(ctx.parsed.y).toLocaleString('en-KE') } }
+            },
+            scales: {
+                x: { ticks: { color: '#636b7e', font: { size: 11 } }, grid: { display: false } },
+                y: {
+                    ticks: { color: '#636b7e', font: { size: 11 }, callback: v => 'KSh ' + Number(v).toLocaleString('en-KE') },
+                    grid: { color: 'rgba(255,255,255,0.04)' },
+                    beginAtZero: true
+                }
+            }
+        }
+    });
 }
 
 /** Render line chart — daily revenue over last 30 days */
@@ -743,17 +881,36 @@ async function openSaleDetail(saleId) {
         `;
 
         // Items rows
-        $('#detail-items-body').innerHTML = sale.items.map(i => `
+        $('#detail-items-body').innerHTML = sale.items.map(i => {
+            const profit = (i.profit_per_item || 0) * i.quantity;
+            const profitClass = profit >= 0 ? 'text-profit' : 'text-loss';
+            return `
             <tr>
                 <td><strong>${escHtml(i.product_name)}</strong></td>
                 <td>${escHtml(i.category || '-')}</td>
                 <td style="text-align:center">${i.quantity}</td>
+                <td>${formatPrice(i.cost_price || 0)}</td>
                 <td>${formatPrice(i.price)}</td>
+                <td class="${profitClass}">${formatPrice(profit)}</td>
                 <td><strong style="color:var(--primary-400)">${formatPrice(i.price * i.quantity)}</strong></td>
             </tr>
-        `).join('');
+            `;
+        }).join('');
 
-        $('#detail-total').textContent = formatPrice(sale.total_amount);
+        const totalProfit = sale.items.reduce((sum, i) => sum + ((i.profit_per_item || 0) * i.quantity), 0);
+        const totalProfitClass = totalProfit >= 0 ? 'text-profit' : 'text-loss';
+        
+        // Add Total Profit to Modal
+        const totalRow = $('#detail-items-table').closest('.table-wrapper').nextElementSibling;
+        if (totalRow) {
+            totalRow.innerHTML = `
+                <div style="display:flex; flex-direction:column; align-items:flex-end;">
+                    <div style="font-size:0.9rem; color:var(--text-muted);">Total Profit: <span class="${totalProfitClass}">${formatPrice(totalProfit)}</span></div>
+                    <div style="margin-top:0.3rem;">Grand Total: <span id="detail-total" class="detail-grand-total">${formatPrice(sale.total_amount)}</span></div>
+                </div>
+            `;
+        }
+
         $('#detail-modal-overlay').classList.add('visible');
     } catch (err) {
         showToast('Could not load sale details', 'error');
