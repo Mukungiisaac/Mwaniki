@@ -111,6 +111,17 @@ def init_db():
         cursor.execute("ALTER TABLE products ADD COLUMN cost_price REAL NOT NULL DEFAULT 0")
     except Exception:
         pass
+    
+    # Ensure analytics columns exist in sales
+    try:
+        cursor.execute("ALTER TABLE sales ADD COLUMN total_gross_profit REAL NOT NULL DEFAULT 0")
+    except Exception: pass
+    try:
+        cursor.execute("ALTER TABLE sales ADD COLUMN total_discount_loss REAL NOT NULL DEFAULT 0")
+    except Exception: pass
+    try:
+        cursor.execute("ALTER TABLE sales ADD COLUMN total_net_profit REAL NOT NULL DEFAULT 0")
+    except Exception: pass
 
     try:
         cursor.execute("ALTER TABLE sales ADD COLUMN total_profit REAL NOT NULL DEFAULT 0")
@@ -363,29 +374,52 @@ def process_sale():
         )
         sale_id = cursor.lastrowid
 
-        sale_total_profit = 0
+        sale_total_gross_profit = 0
+        sale_total_discount_loss = 0
+        sale_total_net_profit = 0
 
         # Insert each sale item and reduce stock
         for item in items:
             product = conn.execute(
-                'SELECT cost_price FROM products WHERE id = ?', (item['product_id'],)
+                'SELECT price, cost_price FROM products WHERE id = ?', (item['product_id'],)
             ).fetchone()
+            
+            retail_price = product['price'] if product and 'price' in product.keys() else 0
             cost_price = product['cost_price'] if product and 'cost_price' in product.keys() else 0
-            profit_per_item = float(item['price']) - cost_price
-            item_total_profit = profit_per_item * int(item['quantity'])
-            sale_total_profit += item_total_profit
+            sold_price = float(item['price'])
+            qty = int(item['quantity'])
+
+            # NEW Logic:
+            # Gross = potential (retail - cost) OR actual (sold - cost), whichever is higher
+            # Loss = reduction from retail (retail - sold, but min 0)
+            # Net = actual (sold - cost)
+            potential_item_profit = (retail_price - cost_price) * qty
+            actual_item_profit = (sold_price - cost_price) * qty
+            
+            item_gross_profit = max(potential_item_profit, actual_item_profit)
+            item_discount_loss = max(0, (retail_price - sold_price) * qty)
+            item_net_profit = actual_item_profit
+
+            sale_total_gross_profit += item_gross_profit
+            sale_total_discount_loss += item_discount_loss
+            sale_total_net_profit += item_net_profit
 
             cursor.execute(
-                'INSERT INTO sale_items (sale_id, product_id, quantity, price, cost_price, profit_per_item, total_profit) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                (sale_id, item['product_id'], item['quantity'], item['price'], cost_price, profit_per_item, item_total_profit)
+                '''INSERT INTO sale_items 
+                   (sale_id, product_id, quantity, price, cost_price, profit_per_item, total_profit) 
+                   VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                (sale_id, item['product_id'], qty, sold_price, cost_price, (sold_price - retail_price), item_net_profit)
             )
             # Reduce stock
             cursor.execute(
                 'UPDATE products SET stock = stock - ? WHERE id = ?',
-                (item['quantity'], item['product_id'])
+                (qty, item['product_id'])
             )
 
-        cursor.execute('UPDATE sales SET total_profit = ? WHERE id = ?', (sale_total_profit, sale_id))
+        cursor.execute(
+            'UPDATE sales SET total_profit = ?, total_gross_profit = ?, total_discount_loss = ?, total_net_profit = ? WHERE id = ?', 
+            (sale_total_net_profit, sale_total_gross_profit, sale_total_discount_loss, sale_total_net_profit, sale_id)
+        )
 
         conn.commit()
         return jsonify({
@@ -453,6 +487,44 @@ def get_sale(sale_id):
     return jsonify(sale_dict)
 
 
+@app.route('/api/sales/<int:sale_id>', methods=['DELETE'])
+@login_required
+@role_required('admin')
+def delete_sale(sale_id):
+    """Delete a sale and RESTORE stock."""
+    conn = get_db()
+    cursor = conn.cursor()
+    
+    # 1. Check if sale exists
+    sale = cursor.execute('SELECT id FROM sales WHERE id = ?', (sale_id,)).fetchone()
+    if not sale:
+        conn.close()
+        return jsonify({'error': 'Sale not found'}), 404
+    
+    # 2. Get items to restore stock
+    items = cursor.execute('SELECT product_id, quantity FROM sale_items WHERE sale_id = ?', (sale_id,)).fetchall()
+    
+    try:
+        # 3. Restore stock for each item
+        for item in items:
+            cursor.execute(
+                'UPDATE products SET stock = stock + ? WHERE id = ?',
+                (item['quantity'], item['product_id'])
+            )
+        
+        # 4. Delete sale (cascades or manual delete of items)
+        cursor.execute('DELETE FROM sale_items WHERE sale_id = ?', (sale_id,))
+        cursor.execute('DELETE FROM sales WHERE id = ?', (sale_id,))
+        
+        conn.commit()
+        return jsonify({'message': f'Sale #{sale_id} deleted and stock restored successfully'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': f'Failed to delete sale: {str(e)}'}), 500
+    finally:
+        conn.close()
+
+
 @app.route('/api/analytics', methods=['GET'])
 @login_required
 @role_required('admin')
@@ -469,9 +541,15 @@ def get_analytics():
     conn = get_db()
 
     # Total revenue and sales count
-    summary = conn.execute(
-        'SELECT COALESCE(SUM(total_amount), 0) as revenue, COALESCE(SUM(total_profit), 0) as total_profit, COUNT(*) as count FROM sales'
+    summary_row = conn.execute(
+        '''SELECT 
+            COALESCE(SUM(total_amount), 0) as revenue, 
+            COALESCE(SUM(total_gross_profit), 0) as total_gross_profit,
+            COALESCE(SUM(total_discount_loss), 0) as total_discount_loss,
+            COALESCE(SUM(total_net_profit), 0) as total_net_profit,
+            COUNT(*) as count FROM sales'''
     ).fetchone()
+    summary = dict(summary_row) if summary_row else {}
 
     # Best-selling products (top 5 by total quantity sold)
     best_sellers = conn.execute('''
@@ -487,7 +565,7 @@ def get_analytics():
     daily_sales = conn.execute('''
         SELECT DATE(date) as day,
                SUM(total_amount) as revenue,
-               SUM(total_profit) as total_profit,
+               SUM(total_net_profit) as total_profit,
                COUNT(*) as count
         FROM sales
         WHERE date >= DATE('now', '-30 days')
@@ -502,27 +580,13 @@ def get_analytics():
         GROUP BY payment_method
     ''').fetchall()
 
-    # Monthly profit current month
-    monthly_profit_row = conn.execute('''
-        SELECT COALESCE(SUM(total_profit), 0) as monthly_profit
-        FROM sales
-        WHERE strftime('%Y-%m', date) = strftime('%Y-%m', 'now')
-    ''').fetchone()
-    
-    # Daily profit today
-    daily_profit_row = conn.execute('''
-        SELECT COALESCE(SUM(total_profit), 0) as daily_profit
-        FROM sales
-        WHERE DATE(date) = DATE('now')
-    ''').fetchone()
-
     conn.close()
     return jsonify({
-        'total_revenue': summary['revenue'],
-        'total_profit': summary['total_profit'],
-        'total_sales': summary['count'],
-        'monthly_profit': monthly_profit_row['monthly_profit'],
-        'daily_profit': daily_profit_row['daily_profit'],
+        'revenue': summary.get('revenue', 0),
+        'total_gross_profit': summary.get('total_gross_profit', 0),
+        'total_discount_loss': summary.get('total_discount_loss', 0),
+        'total_net_profit': summary.get('total_net_profit', 0),
+        'count': summary.get('count', 0),
         'best_sellers': [dict(r) for r in best_sellers],
         'daily_sales': [dict(r) for r in daily_sales],
         'payment_breakdown': [dict(r) for r in payment_breakdown]

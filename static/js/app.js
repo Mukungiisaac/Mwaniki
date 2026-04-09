@@ -316,6 +316,31 @@ function initQtyModal() {
 // CART
 // ═══════════════════════════════════════════════════════════════════════════════
 
+function updateCartPrice(productId, newPrice) {
+    const item = cart.find(i => i.product_id === productId);
+    if (!item) return;
+    item.price = parseFloat(newPrice) || 0;
+    
+    // Update the profit label for this item without re-rendering the whole cart
+    const itemEl = $(`.cart-item[data-id="${productId}"]`);
+    if (itemEl) {
+        const profitEl = itemEl.querySelector('.cart-item-profit');
+        // Calculate Actual Net Profit: Sold - Cost
+        const actualProfit = (item.price - item.cost_price) * item.quantity;
+        const profitClass = actualProfit >= 0 ? 'text-profit' : 'text-loss';
+        profitEl.className = `cart-item-profit ${profitClass}`;
+        profitEl.textContent = (actualProfit >= 0 ? 'Profit: ' : 'Loss: ') + formatPrice(Math.abs(actualProfit));
+        
+        const itemTotalEl = itemEl.querySelector('.cart-item-total');
+        if (itemTotalEl) {
+            itemTotalEl.textContent = formatPrice(item.price * item.quantity);
+        }
+    }
+
+    const total = getCartTotal();
+    $('#cart-total').textContent = formatPrice(total);
+}
+
 function addToCart(productId, quantity) {
     const product = products.find(p => p.id === productId);
     if (!product) return;
@@ -333,7 +358,14 @@ function addToCart(productId, quantity) {
             showToast(`Only ${product.stock} available`, 'warning');
             return;
         }
-        cart.push({ product_id: productId, name: product.name, price: product.price, quantity });
+        cart.push({ 
+            product_id: productId, 
+            name: product.name, 
+            price: product.price, // Selling price (initially matches retail)
+            retail_price: product.price, // Original retail price
+            cost_price: product.cost_price || 0,
+            quantity 
+        });
     }
     showToast(`${product.name} added to cart`);
     renderCart();
@@ -373,30 +405,40 @@ function getCartTotal() {
 
 function renderCart() {
     const container = $('#cart-items');
-    const emptyEl = $('#cart-empty');
     const payBtn = $('#btn-pay');
 
     updateStats();
 
     if (cart.length === 0) {
-        container.innerHTML = '';
-        container.appendChild(emptyEl);
-        emptyEl.style.display = 'flex';
+        container.innerHTML = `
+            <div class="cart-empty" id="cart-empty" style="display:flex;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                <p>Cart is empty</p>
+                <span>Click on products to add them</span>
+            </div>
+        `;
         payBtn.disabled = true;
         $('#cart-total').textContent = 'KSh 0.00';
         return;
     }
 
-    emptyEl.style.display = 'none';
     payBtn.disabled = false;
     const total = getCartTotal();
     $('#cart-total').textContent = formatPrice(total);
 
     container.innerHTML = cart.map(item => `
-        <div class="cart-item">
+        <div class="cart-item" data-id="${item.product_id}">
             <div class="cart-item-info">
                 <div class="cart-item-name">${escHtml(item.name)}</div>
-                <div class="cart-item-price">${formatPrice(item.price)} each</div>
+                <div class="cart-item-price">
+                    <input type="number" step="0.01" class="cart-price-input" value="${item.price}" 
+                        oninput="updateCartPrice(${item.product_id}, this.value)" 
+                        title="Set selling price">
+                    <div class="cart-item-profit ${item.price >= item.retail_price ? 'text-profit' : 'text-loss'}">
+                        ${(item.price - item.retail_price) >= 0 ? 'Profit' : 'Loss'}: 
+                        ${formatPrice(Math.abs((item.price - item.retail_price) * item.quantity))}
+                    </div>
+                </div>
             </div>
             <div class="cart-item-qty">
                 <button onclick="updateCartQty(${item.product_id}, -1)">−</button>
@@ -472,7 +514,7 @@ async function processSale() {
     } catch (err) {
         showToast(err.message || 'Sale failed', 'error');
         payBtn.disabled = false;
-        payBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Pay Now`;
+        payBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Record`;
     }
 }
 
@@ -534,24 +576,18 @@ async function loadAnalytics() {
         const data = await res.json();
 
         // KPI cards
-        $('#kpi-revenue').textContent = formatPrice(data.total_revenue);
-        $('#kpi-sales').textContent   = data.total_sales;
+        $('#kpi-revenue').textContent = formatPrice(data.revenue);
+        $('#kpi-sales').textContent   = data.count;
         
-        // Profit cards
-        $('#kpi-total-profit').textContent = formatPrice(data.total_profit);
-        $('#kpi-monthly-profit').textContent = formatPrice(data.monthly_profit);
-        $('#kpi-daily-profit').textContent = formatPrice(data.daily_profit);
+        // Profit cards (Updated: Interchanged Gross and Net as requested)
+        $('#kpi-gross-profit').textContent = formatPrice(data.total_net_profit); // Show Actual in Gross
+        $('#kpi-discount-loss').textContent = formatPrice(data.total_discount_loss);
+        $('#kpi-net-profit').textContent = formatPrice(data.total_gross_profit); // Show Potential in Net
 
-        // Apply color classes to profit cards
-        const profitCards = [
-            { el: $('#kpi-total-profit'), val: data.total_profit },
-            { el: $('#kpi-monthly-profit'), val: data.monthly_profit },
-            { el: $('#kpi-daily-profit'), val: data.daily_profit }
-        ];
-        profitCards.forEach(p => {
-            p.el.classList.remove('text-profit', 'text-loss');
-            p.el.classList.add(p.val >= 0 ? 'text-profit' : 'text-loss');
-        });
+        // Apply color classes to Gross Profit (Actual)
+        const grossProfitEl = $('#kpi-gross-profit');
+        grossProfitEl.classList.remove('text-profit', 'text-loss');
+        grossProfitEl.classList.add(data.total_net_profit >= 0 ? 'text-profit' : 'text-loss');
 
         // Payment breakdown
         let cashCount = 0, mpesaCount = 0;
@@ -837,10 +873,15 @@ function renderSalesTable(sales) {
             <td><span class="item-count-badge">${itemCount} item${itemCount !== 1 ? 's' : ''}</span></td>
             <td><span class="pm-badge ${pmClass}">${escHtml(sale.payment_method || 'Cash')}</span></td>
             <td><strong style="color:var(--primary-400)">${formatPrice(sale.total_amount)}</strong></td>
+            <td><span class="${(sale.total_profit || 0) >= 0 ? 'text-profit' : 'text-loss'}">${formatPrice(sale.total_profit || 0)}</span></td>
             <td>
                 <button class="btn-view-detail" onclick="openSaleDetail(${sale.id})">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                     View
+                </button>
+                <button class="btn-delete-sale" onclick="deleteSale(${sale.id})">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18m-2 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    Delete
                 </button>
             </td>
         </tr>`;
@@ -1252,3 +1293,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderCategoryFilters();
     updateStats();
 });
+
+
+/** Delete a sale record and refresh UI */
+async function deleteSale(saleId) {
+    if (!confirm(`Are you sure you want to delete Sale #${saleId}? This will restore the product stock and remove the transaction permanently.`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/sales/${saleId}`, {
+            method: 'DELETE'
+        });
+        const data = await res.json();
+
+        if (res.ok) {
+            showToast(data.message, 'success');
+            loadSalesHistory(); 
+        } else {
+            showToast(data.error || 'Failed to delete sale', 'error');
+        }
+    } catch (err) {
+        showToast('Connection error while deleting sale', 'error');
+    }
+}

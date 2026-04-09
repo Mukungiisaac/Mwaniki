@@ -671,7 +671,43 @@ a {
 
 .cart-item-price {
     font-size: 0.73rem;
-    color: var(--text-muted)
+    color: var(--text-muted);
+    margin-top: 0.1rem;
+}
+
+.cart-price-input {
+    background: var(--bg-input);
+    border: 1px solid var(--border-subtle);
+    color: var(--primary-400);
+    border-radius: var(--radius-sm);
+    padding: 0.15rem 0.35rem;
+    width: 80px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    outline: none;
+    transition: all var(--transition-fast);
+}
+
+.cart-price-input:focus {
+    border-color: var(--primary-500);
+    background: var(--bg-hover);
+}
+
+/* Remove arrows for number input */
+.cart-price-input::-webkit-outer-spin-button,
+.cart-price-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.cart-price-input[type=number] {
+    -moz-appearance: textfield;
+}
+
+.cart-item-profit {
+    font-size: 0.68rem;
+    font-weight: 500;
+    margin-top: 0.2rem;
+    display: block;
 }
 
 .cart-item-qty {
@@ -2591,4 +2627,29 @@ a {
         text-align: center;
         gap: 0.5rem;
     }
+}
+
+/* Delete sale button */
+.btn-delete-sale {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.75rem;
+    background: rgba(239, 83, 80, 0.10);
+    color: #ef5350;
+    border: 1px solid rgba(239, 83, 80, 0.2);
+    border-radius: var(--radius-sm);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+.btn-delete-sale svg {
+    width: 14px;
+    height: 14px;
+}
+.btn-delete-sale:hover {
+    background: rgba(239, 83, 80, 0.2);
+    border-color: #ef5350;
+    color: #ef5350;
 }
