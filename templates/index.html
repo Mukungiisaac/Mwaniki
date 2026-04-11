@@ -8,8 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=5">
-    <link rel="stylesheet" href="/static/css/print.css?v=3" media="print">
+    <link rel="stylesheet" href="/static/css/style.css?v=11">
+    <link rel="stylesheet" href="/static/css/print.css?v=5" media="print">
 </head>
 <body>
     <div id="app-container">
@@ -75,6 +75,10 @@
             <button class="nav-tab" data-tab="sales" id="nav-sales">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                 <span>Sales History</span>
+            </button>
+            <button class="nav-tab" data-tab="stock" id="nav-stock">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/></svg>
+                <span>Stock Tracking</span>
             </button>
             {% if user.role == 'admin' %}
             <button class="nav-tab admin-only" data-tab="monthly" id="nav-monthly">
@@ -172,10 +176,28 @@
                                 </button>
                             </div>
                         </div>
-                        <div class="cart-total">
-                            <span>Total</span>
-                            <span class="total-amount" id="cart-total">KSh 0.00</span>
+                        
+                        <!-- Total Buying Price -->
+                        <div class="cart-summary-row">
+                            <span>Total Buying Price</span>
+                            <span class="buying-total" id="cart-buying-total">KSh 0.00</span>
                         </div>
+                        
+                        <!-- Total Selling Price Input -->
+                        <div class="cart-selling-price">
+                            <label for="total-selling-price">Total Selling Price</label>
+                            <input type="number" id="total-selling-price" step="0.01" min="0" 
+                                   placeholder="Enter total selling price" 
+                                   oninput="updateTotalProfit()" 
+                                   class="selling-price-input">
+                        </div>
+                        
+                        <!-- Profit/Loss Display -->
+                        <div class="cart-profit-display" id="cart-profit-display">
+                            <span class="profit-label">Profit/Loss:</span>
+                            <span class="profit-amount" id="profit-amount">KSh 0.00</span>
+                        </div>
+                        
                         <button class="btn-pay" id="btn-pay" disabled>
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
                             Record
@@ -221,12 +243,8 @@
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label for="product-price">Cost Price (KSh)</label>
+                                <label for="product-price">Buying Price (KSh)</label>
                                 <input type="number" id="product-price" placeholder="0.00" min="0" step="0.01" required>
-                            </div>
-                            <div class="form-group">
-                                <label for="product-selling-price">Selling Price (KSh)</label>
-                                <input type="number" id="product-selling-price" placeholder="0.00" min="0" step="0.01" required>
                             </div>
                             <div class="form-group">
                                 <label for="product-stock">Stock Quantity</label>
@@ -259,7 +277,7 @@
                                     <th>ID</th>
                                     <th>Name</th>
                                     <th>Category</th>
-                                    <th>Cost Price (KSh)</th>
+                                    <th>Buying Price (KSh)</th>
                                     <th>Stock</th>
                                     <th>Actions</th>
                                 </tr>
@@ -291,7 +309,7 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                     </div>
                     <div class="kpi-info">
-                        <span class="kpi-label">Total Revenue</span>
+                        <span class="kpi-label">Total Revenue (Selling)</span>
                         <span class="kpi-value" id="kpi-revenue">KSh 0.00</span>
                     </div>
                 </div>
@@ -332,7 +350,7 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
                     </div>
                     <div class="kpi-info">
-                        <span class="kpi-label">Total Profit</span>
+                        <span class="kpi-label">Net Profit/Loss</span>
                         <span class="kpi-value" id="kpi-gross-profit">KSh 0.00</span>
                     </div>
                 </div>
@@ -342,7 +360,7 @@
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 17 2 2 4-4m5-2 2 2 4-4m-5 9h5"/></svg>
                     </div>
                     <div class="kpi-info">
-                        <span class="kpi-label">Total Loss (Discounts)</span>
+                        <span class="kpi-label">Total Loss Amount</span>
                         <span class="kpi-value" id="kpi-discount-loss">KSh 0.00</span>
                     </div>
                 </div>
@@ -454,6 +472,105 @@
         </section>
 
         <!-- ══════════════════════════════════════════════════════════ -->
+        <!-- STOCK TRACKING TAB                                        -->
+        <!-- ══════════════════════════════════════════════════════════ -->
+        <section class="tab-content" id="tab-stock">
+
+            <!-- ── Stock Summary KPI Cards ──────────────────────── -->
+            <div class="kpi-row" id="stock-kpi-row">
+                <div class="kpi-card">
+                    <div class="kpi-icon" style="background: rgba(59, 130, 246, 0.15); color: #3b82f6;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                    </div>
+                    <div class="kpi-info">
+                        <span class="kpi-label">Total Products</span>
+                        <span class="kpi-value" id="stock-total-products">0</span>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-icon" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                    </div>
+                    <div class="kpi-info">
+                        <span class="kpi-label">Total Initial Stock</span>
+                        <span class="kpi-value" id="stock-total-initial">0</span>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-icon" style="background: rgba(239, 83, 80, 0.15); color: #ef5350;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    </div>
+                    <div class="kpi-info">
+                        <span class="kpi-label">Total Sold</span>
+                        <span class="kpi-value" id="stock-total-sold">0</span>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-icon" style="background: rgba(255, 193, 7, 0.15); color: #ffc107;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                    </div>
+                    <div class="kpi-info">
+                        <span class="kpi-label">Total Remaining</span>
+                        <span class="kpi-value" id="stock-total-remaining">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Stock Tracking Table ─────────────────────────── -->
+            <div class="sales-table-card">
+                <div class="panel-header">
+                    <h2>Stock Tracking Details</h2>
+                    <button class="btn-refresh" id="btn-refresh-stock" title="Refresh">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                        Refresh
+                    </button>
+                </div>
+
+                <!-- Search & Filter Bar -->
+                <div class="sales-filters">
+                    <div class="search-box">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="text" id="stock-search" placeholder="Search by product name or category...">
+                    </div>
+                    <select id="stock-filter-category" class="filter-select">
+                        <option value="">All Categories</option>
+                    </select>
+                    <select id="stock-filter-status" class="filter-select">
+                        <option value="">All Stock Status</option>
+                        <option value="in-stock">In Stock</option>
+                        <option value="low-stock">Low Stock (≤5)</option>
+                        <option value="out-of-stock">Out of Stock</option>
+                    </select>
+                    <button class="btn-secondary btn-sm" id="btn-clear-stock-filters">Clear</button>
+                </div>
+
+                <div class="table-wrapper">
+                    <table id="stock-table">
+                        <thead>
+                            <tr>
+                                <th>Product Name</th>
+                                <th>Category</th>
+                                <th>Initial Stock</th>
+                                <th>Sold</th>
+                                <th>Remaining</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stock-table-body">
+                            <!-- Rows loaded dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="empty-state" id="stock-empty" style="display:none;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                    <p>No stock data available</p>
+                    <span>Add products to see stock tracking information</span>
+                </div>
+            </div>
+
+        </section>
+
+        <!-- ══════════════════════════════════════════════════════════ -->
         <!-- MONTHLY PROFIT TAB (Admin Only)                           -->
         <!-- ══════════════════════════════════════════════════════════ -->
         {% if user.role == 'admin' %}
@@ -484,8 +601,8 @@
                                 <th>Month</th>
                                 <th>Sales Count</th>
                                 <th>Revenue</th>
-                                <th>Loss (Discounts)</th>
-                                <th>Profit (Actual)</th>
+                                <th>Buying Price</th>
+                                <th>Profit/Loss</th>
                             </tr>
                         </thead>
                         <tbody id="monthly-table-body">
@@ -777,6 +894,6 @@
             }
         }
     </script>
-    <script src="/static/js/app.js?v=3"></script>
+    <script src="/static/js/app.js?v=12"></script>
 </body>
 </html>

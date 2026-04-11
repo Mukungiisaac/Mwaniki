@@ -52,6 +52,7 @@ function initTabs() {
             if (tab.dataset.tab === 'products') loadProductsTable();
             if (tab.dataset.tab === 'sales') loadSalesHistory();
             if (tab.dataset.tab === 'pos') renderPOSGrid();
+            if (tab.dataset.tab === 'stock') loadStockTracking();
             if (tab.dataset.tab === 'monthly') loadMonthlyAnalytics();
             if (tab.dataset.tab === 'users') {
                 await fetchUsers();
@@ -125,10 +126,9 @@ function initProductForm() {
             name: $('#product-name').value.trim(),
             category: $('#product-category').value,
             cost_price: parseFloat($('#product-price').value),
-            price: parseFloat($('#product-selling-price').value),
             stock: parseInt($('#product-stock').value)
         };
-        if (!data.name || !data.category || isNaN(data.cost_price) || isNaN(data.price) || isNaN(data.stock)) {
+        if (!data.name || !data.category || isNaN(data.cost_price) || isNaN(data.stock)) {
             showToast('Please fill in all fields correctly', 'warning');
             return;
         }
@@ -154,7 +154,6 @@ function editProduct(id) {
     $('#product-name').value = product.name;
     $('#product-category').value = product.category;
     $('#product-price').value = product.cost_price || 0;
-    $('#product-selling-price').value = product.price;
     $('#product-stock').value = product.stock;
     $('#form-title').innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit Product`;
     $('#btn-save-product').innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Update Product`;
@@ -311,31 +310,6 @@ function initQtyModal() {
 // CART
 // ═══════════════════════════════════════════════════════════════════════════════
 
-function updateCartPrice(productId, newPrice) {
-    const item = cart.find(i => i.product_id === productId);
-    if (!item) return;
-    item.price = parseFloat(newPrice) || 0;
-    
-    // Update the profit label for this item without re-rendering the whole cart
-    const itemEl = $(`.cart-item[data-id="${productId}"]`);
-    if (itemEl) {
-        const profitEl = itemEl.querySelector('.cart-item-profit');
-        // Calculate Profit/Loss relative to cost price (actual profit)
-        const actualProfit = (item.price - item.cost_price) * item.quantity;
-        const profitClass = actualProfit >= 0 ? 'text-profit' : 'text-loss';
-        profitEl.className = `cart-item-profit ${profitClass}`;
-        profitEl.textContent = (actualProfit >= 0 ? 'Profit: ' : 'Loss: -') + formatPrice(Math.abs(actualProfit));
-        
-        const itemTotalEl = itemEl.querySelector('.cart-item-total');
-        if (itemTotalEl) {
-            itemTotalEl.textContent = formatPrice(item.price * item.quantity);
-        }
-    }
-
-    const total = getCartTotal();
-    $('#cart-total').textContent = formatPrice(total);
-}
-
 function addToCart(productId, quantity) {
     const product = products.find(p => p.id === productId);
     if (!product) return;
@@ -356,7 +330,7 @@ function addToCart(productId, quantity) {
         cart.push({ 
             product_id: productId, 
             name: product.name, 
-            price: product.price, // Selling price (initially matches retail)
+            price: product.cost_price || 0, // Start with buying price (cost_price)
             retail_price: product.price, // Original retail price
             cost_price: product.cost_price || 0,
             quantity 
@@ -390,6 +364,7 @@ function removeFromCart(productId) {
 function clearCart() {
     if (cart.length === 0) return;
     cart = [];
+    $('#total-selling-price').value = ''; // Clear selling price input
     renderCart();
     showToast('Cart cleared');
 }
@@ -413,26 +388,40 @@ function renderCart() {
             </div>
         `;
         payBtn.disabled = true;
-        $('#cart-total').textContent = 'KSh 0.00';
+        
+        // Safely update cart total if element exists
+        const cartTotalEl = $('#cart-total');
+        if (cartTotalEl) {
+            cartTotalEl.textContent = 'KSh 0.00';
+        }
+        
+        // Reset cart footer elements if they exist
+        const buyingTotalEl = $('#cart-buying-total');
+        const profitAmountEl = $('#profit-amount');
+        const sellingPriceInput = $('#total-selling-price');
+        
+        if (buyingTotalEl) buyingTotalEl.textContent = 'KSh 0.00';
+        if (profitAmountEl) {
+            profitAmountEl.textContent = 'KSh 0.00';
+            profitAmountEl.className = 'profit-amount';
+        }
+        if (sellingPriceInput) sellingPriceInput.value = '';
+        
         return;
     }
 
     payBtn.disabled = false;
-    const total = getCartTotal();
-    $('#cart-total').textContent = formatPrice(total);
+    
+    // Update cart totals and profit/loss
+    updateCartTotals();
 
     container.innerHTML = cart.map(item => `
         <div class="cart-item" data-id="${item.product_id}">
             <div class="cart-item-info">
                 <div class="cart-item-name">${escHtml(item.name)}</div>
-                <div class="cart-item-price">
-                    <input type="number" step="0.01" class="cart-price-input" value="${item.price}" 
-                        oninput="updateCartPrice(${item.product_id}, this.value)" 
-                        title="Set selling price">
-                    <div class="cart-item-profit ${item.price >= item.cost_price ? 'text-profit' : 'text-loss'}">
-                        ${(item.price - item.cost_price) >= 0 ? 'Profit' : 'Loss'}: 
-                        ${(item.price - item.cost_price) >= 0 ? '' : '-'}${formatPrice(Math.abs((item.price - item.cost_price) * item.quantity))}
-                    </div>
+                <div class="cart-item-details">
+                    <span class="cart-buying-price">Buying: ${formatPrice(item.cost_price)}</span>
+                    <span class="cart-qty-info">Qty: ${item.quantity}</span>
                 </div>
             </div>
             <div class="cart-item-qty">
@@ -440,7 +429,7 @@ function renderCart() {
                 <span>${item.quantity}</span>
                 <button onclick="updateCartQty(${item.product_id}, 1)">+</button>
             </div>
-            <div class="cart-item-total">${formatPrice(item.price * item.quantity)}</div>
+            <div class="cart-item-subtotal">${formatPrice(item.cost_price * item.quantity)}</div>
             <button class="cart-item-remove" onclick="removeFromCart(${item.product_id})">×</button>
         </div>
     `).join('');
@@ -467,10 +456,29 @@ function initPaymentMethod() {
 
 async function processSale() {
     if (cart.length === 0) return;
-    const total = getCartTotal();
-
-    // Capture cart snapshot before clearing (for receipt)
-    const cartSnapshot = cart.map(item => ({ ...item }));
+    
+    // Get total selling price from input
+    const totalSellingPrice = parseFloat($('#total-selling-price').value) || 0;
+    if (totalSellingPrice <= 0) {
+        showToast('Please enter a valid selling price', 'warning');
+        return;
+    }
+    
+    // Calculate total buying price
+    const totalBuyingPrice = cart.reduce((sum, item) => sum + (item.cost_price * item.quantity), 0);
+    
+    // Distribute selling price proportionally based on buying price
+    const cartSnapshot = cart.map(item => {
+        const itemBuyingTotal = item.cost_price * item.quantity;
+        const proportion = itemBuyingTotal / totalBuyingPrice;
+        const itemSellingTotal = totalSellingPrice * proportion;
+        const itemSellingPrice = itemSellingTotal / item.quantity;
+        
+        return {
+            ...item,
+            price: itemSellingPrice // Update price to distributed selling price
+        };
+    });
 
     const saleData = {
         items: cartSnapshot.map(item => ({
@@ -478,7 +486,7 @@ async function processSale() {
             quantity: item.quantity,
             price: item.price
         })),
-        total_amount: total,
+        total_amount: totalSellingPrice,
         payment_method: selectedPaymentMethod
     };
 
@@ -496,16 +504,21 @@ async function processSale() {
         const result = await res.json();
         if (!res.ok) throw new Error(result.error);
 
-        // Populate and show receipt modal
-        populateReceipt(result, cartSnapshot, total);
-        $('#modal-overlay').classList.add('visible');
+        // Show success message instead of receipt
+        showToast(`Sale #${result.sale_id} recorded successfully! Total: ${formatPrice(totalSellingPrice)}`, 'success');
 
         // Clear cart and refresh products
         cart = [];
+        $('#total-selling-price').value = ''; // Clear selling price input
         renderCart();
         await fetchProducts();
         renderPOSGrid();
         renderCategoryFilters();
+        
+        // Re-enable pay button
+        payBtn.disabled = false;
+        payBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg> Record`;
+        
     } catch (err) {
         showToast(err.message || 'Sale failed', 'error');
         payBtn.disabled = false;
@@ -570,18 +583,50 @@ async function loadAnalytics() {
         const res = await fetch('/api/analytics');
         const data = await res.json();
 
-        // KPI cards
-        $('#kpi-revenue').textContent = formatPrice(data.revenue);
-        $('#kpi-sales').textContent   = data.count;
+        // Calculate totals from sales data (same as transaction history)
+        const salesRes = await fetch('/api/sales');
+        const salesData = await salesRes.json();
         
-        // Profit cards
-        $('#kpi-gross-profit').textContent = (data.total_net_profit >= 0 ? '' : '-') + formatPrice(Math.abs(data.total_net_profit));
-        $('#kpi-discount-loss').textContent = formatPrice(data.total_discount_loss);
+        let totalBuyingPrice = 0;
+        let totalSellingPrice = 0;
+        let totalProfit = 0;
+        let totalLoss = 0;
+        
+        salesData.forEach(sale => {
+            if (sale.items) {
+                let saleBuyingPrice = 0;
+                let saleSellingPrice = 0;
+                
+                sale.items.forEach(item => {
+                    saleBuyingPrice += (item.cost_price || 0) * item.quantity;
+                    saleSellingPrice += item.price * item.quantity;
+                });
+                
+                totalBuyingPrice += saleBuyingPrice;
+                totalSellingPrice += saleSellingPrice;
+                
+                const profitLoss = saleSellingPrice - saleBuyingPrice;
+                if (profitLoss >= 0) {
+                    totalProfit += profitLoss;
+                } else {
+                    totalLoss += Math.abs(profitLoss);
+                }
+            }
+        });
 
-        // Apply color classes to Gross Profit (Actual)
+        // KPI cards - using calculated values that match transaction history
+        $('#kpi-revenue').textContent = formatPrice(totalSellingPrice); // Total selling price
+        $('#kpi-sales').textContent = data.count;
+        
+        // Show total profit or total loss
+        const netProfitLoss = totalProfit - totalLoss;
+        $('#kpi-gross-profit').textContent = (netProfitLoss >= 0 ? '' : '-') + formatPrice(Math.abs(netProfitLoss));
+        $('#kpi-discount-loss').textContent = formatPrice(totalLoss);
+
+        // Apply color classes to Total Profit
         const grossProfitEl = $('#kpi-gross-profit');
         grossProfitEl.classList.remove('text-profit', 'text-loss');
-        grossProfitEl.classList.add(data.total_net_profit >= 0 ? 'text-profit' : 'text-loss');
+        grossProfitEl.classList.add(netProfitLoss >= 0 ? 'text-profit' : 'text-loss');
 
         // Payment breakdown
         let cashCount = 0, mpesaCount = 0;
@@ -1334,10 +1379,53 @@ let monthlyProfitChartInstance = null;
 
 async function loadMonthlyAnalytics() {
     try {
-        const res = await fetch('/api/analytics');
-        const data = await res.json();
+        // Get all sales data to calculate monthly totals
+        const salesRes = await fetch('/api/sales');
+        const salesData = await salesRes.json();
         
-        const monthlySales = data.monthly_sales || [];
+        // Group sales by month and calculate totals
+        const monthlyData = {};
+        
+        salesData.forEach(sale => {
+            const saleDate = new Date(sale.date);
+            const monthKey = `${saleDate.getFullYear()}-${String(saleDate.getMonth() + 1).padStart(2, '0')}`;
+            
+            if (!monthlyData[monthKey]) {
+                monthlyData[monthKey] = {
+                    month: monthKey,
+                    count: 0,
+                    totalBuyingPrice: 0,
+                    totalSellingPrice: 0,
+                    totalProfit: 0,
+                    totalLoss: 0
+                };
+            }
+            
+            monthlyData[monthKey].count++;
+            
+            if (sale.items) {
+                let saleBuyingPrice = 0;
+                let saleSellingPrice = 0;
+                
+                sale.items.forEach(item => {
+                    saleBuyingPrice += (item.cost_price || 0) * item.quantity;
+                    saleSellingPrice += item.price * item.quantity;
+                });
+                
+                monthlyData[monthKey].totalBuyingPrice += saleBuyingPrice;
+                monthlyData[monthKey].totalSellingPrice += saleSellingPrice;
+                
+                const profitLoss = saleSellingPrice - saleBuyingPrice;
+                if (profitLoss >= 0) {
+                    monthlyData[monthKey].totalProfit += profitLoss;
+                } else {
+                    monthlyData[monthKey].totalLoss += Math.abs(profitLoss);
+                }
+            }
+        });
+        
+        // Convert to array and sort by month (newest first)
+        const monthlySales = Object.values(monthlyData).sort((a, b) => b.month.localeCompare(a.month));
         
         // 1. Render Table
         const tbody = $('#monthly-table-body');
@@ -1349,19 +1437,34 @@ async function loadMonthlyAnalytics() {
         } else {
             if (emptyEl) emptyEl.style.display = 'none';
             if($('#monthly-table')) $('#monthly-table').closest('.table-wrapper').style.display = 'block';
-            tbody.innerHTML = monthlySales.map(m => `
+            tbody.innerHTML = monthlySales.map(m => {
+                const netProfitLoss = m.totalProfit - m.totalLoss;
+                const profitLossClass = netProfitLoss >= 0 ? 'text-profit' : 'text-loss';
+                const profitLossText = netProfitLoss >= 0 ? 'Profit: ' : 'Loss: -';
+                
+                return `
                 <tr>
                     <td><strong>${m.month}</strong></td>
                     <td>${m.count}</td>
-                    <td>${formatPrice(m.revenue)}</td>
-                    <td class="text-loss">-${formatPrice(m.discount_loss)}</td>
-                    <td class="${m.net_profit >= 0 ? 'text-profit' : 'text-loss'}">${m.net_profit >= 0 ? '' : '-'}${formatPrice(Math.abs(m.net_profit))}</td>
+                    <td>${formatPrice(m.totalSellingPrice)}</td>
+                    <td>${formatPrice(m.totalBuyingPrice)}</td>
+                    <td class="${profitLossClass}">${profitLossText}${formatPrice(Math.abs(netProfitLoss))}</td>
                 </tr>
-            `).join('');
+                `;
+            }).join('');
         }
         
         // 2. Render KPI Cards for current month
-        const currentMonth = monthlySales[0] || { revenue: 0, gross_profit: 0, discount_loss: 0, net_profit: 0, count: 0 };
+        const currentMonth = monthlySales[0] || { 
+            month: 'Current', 
+            count: 0, 
+            totalSellingPrice: 0, 
+            totalBuyingPrice: 0, 
+            totalProfit: 0, 
+            totalLoss: 0 
+        };
+        const currentNetProfit = currentMonth.totalProfit - currentMonth.totalLoss;
+        
         const kpiRow = $('#monthly-kpi-row');
         if (kpiRow) {
             kpiRow.innerHTML = `
@@ -1370,8 +1473,8 @@ async function loadMonthlyAnalytics() {
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
                     </div>
                     <div class="kpi-info">
-                        <span class="kpi-label">Revenue (${currentMonth.month || 'Current'})</span>
-                        <span class="kpi-value">${formatPrice(currentMonth.revenue)}</span>
+                        <span class="kpi-label">Revenue (${currentMonth.month})</span>
+                        <span class="kpi-value">${formatPrice(currentMonth.totalSellingPrice)}</span>
                     </div>
                 </div>
                 <div class="kpi-card">
@@ -1380,7 +1483,7 @@ async function loadMonthlyAnalytics() {
                     </div>
                     <div class="kpi-info">
                         <span class="kpi-label">Month Net Profit</span>
-                        <span class="kpi-value ${currentMonth.net_profit >= 0 ? 'text-profit' : 'text-loss'}">${currentMonth.net_profit >= 0 ? '' : '-'}${formatPrice(Math.abs(currentMonth.net_profit))}</span>
+                        <span class="kpi-value ${currentNetProfit >= 0 ? 'text-profit' : 'text-loss'}">${currentNetProfit >= 0 ? '' : '-'}${formatPrice(Math.abs(currentNetProfit))}</span>
                     </div>
                 </div>
                 <div class="kpi-card">
@@ -1399,8 +1502,8 @@ async function loadMonthlyAnalytics() {
         renderMonthlyProfitChart(monthlySales);
         
     } catch (err) {
+        console.error('Monthly analytics error:', err);
         showToast('Failed to load monthly analytics', 'error');
-        console.error(err);
     }
 }
 
@@ -1411,8 +1514,8 @@ function renderMonthlyProfitChart(monthlySales) {
     // Reverse for chronological order in chart
     const chartData = [...monthlySales].reverse();
     const labels = chartData.map(m => m.month);
-    const profits = chartData.map(m => m.net_profit);
-    const revenues = chartData.map(m => m.revenue);
+    const profits = chartData.map(m => m.totalProfit - m.totalLoss); // Net profit/loss
+    const revenues = chartData.map(m => m.totalSellingPrice); // Total selling price
     
     if (monthlyProfitChartInstance) monthlyProfitChartInstance.destroy();
     
@@ -1422,10 +1525,10 @@ function renderMonthlyProfitChart(monthlySales) {
             labels,
             datasets: [
                 {
-                    label: 'Net Profit (KSh)',
+                    label: 'Net Profit/Loss (KSh)',
                     data: profits,
-                    backgroundColor: 'rgba(16, 185, 129, 0.7)',
-                    borderColor: '#10b981',
+                    backgroundColor: profits.map(p => p >= 0 ? 'rgba(16, 185, 129, 0.7)' : 'rgba(239, 83, 80, 0.7)'),
+                    borderColor: profits.map(p => p >= 0 ? '#10b981' : '#ef5350'),
                     borderWidth: 1,
                     borderRadius: 4,
                     order: 2
@@ -1467,4 +1570,144 @@ function renderMonthlyProfitChart(monthlySales) {
             }
         }
     });
+}
+
+// ─── Stock Tracking ────────────────────────────────────────────────────────────
+
+let allStockData = [];
+
+async function loadStockTracking() {
+    try {
+        const res = await fetch('/api/stock-tracking');
+        const data = await res.json();
+        
+        allStockData = data.products || [];
+        
+        // Update KPI cards
+        $('#stock-total-products').textContent = data.summary.total_products;
+        $('#stock-total-initial').textContent = data.summary.total_initial;
+        $('#stock-total-sold').textContent = data.summary.total_sold;
+        $('#stock-total-remaining').textContent = data.summary.total_remaining;
+        
+        // Populate category filter
+        const categories = [...new Set(allStockData.map(p => p.category))].sort();
+        const categoryFilter = $('#stock-filter-category');
+        categoryFilter.innerHTML = '<option value="">All Categories</option>' + 
+            categories.map(cat => `<option value="${escHtml(cat)}">${escHtml(cat)}</option>`).join('');
+        
+        // Render table
+        renderStockTable(allStockData);
+        
+    } catch (err) {
+        showToast('Failed to load stock tracking data', 'error');
+        console.error(err);
+    }
+}
+
+function renderStockTable(stockData) {
+    const tbody = $('#stock-table-body');
+    const emptyEl = $('#stock-empty');
+    const wrapper = $('#stock-table').closest('.table-wrapper');
+
+    if (stockData.length === 0) {
+        tbody.innerHTML = '';
+        wrapper.style.display = 'none';
+        emptyEl.style.display = 'flex';
+        return;
+    }
+    
+    wrapper.style.display = 'block';
+    emptyEl.style.display = 'none';
+
+    tbody.innerHTML = stockData.map(product => {
+        return `<tr>
+            <td><strong>${escHtml(product.name)}</strong></td>
+            <td><span class="category-badge">${escHtml(product.category)}</span></td>
+            <td><span class="stock-initial">${product.initial_stock}</span></td>
+            <td><span class="stock-sold">${product.sold_quantity}</span></td>
+            <td><span class="stock-remaining">${product.current_stock}</span></td>
+            <td><span class="stock-badge ${product.status_class}">${product.status_label}</span></td>
+        </tr>`;
+    }).join('');
+}
+
+function filterStockData() {
+    const search = ($('#stock-search')?.value || '').toLowerCase();
+    const categoryFilter = $('#stock-filter-category')?.value || '';
+    const statusFilter = $('#stock-filter-status')?.value || '';
+
+    const filtered = allStockData.filter(product => {
+        const matchSearch = product.name.toLowerCase().includes(search) || 
+                          product.category.toLowerCase().includes(search);
+        const matchCategory = !categoryFilter || product.category === categoryFilter;
+        const matchStatus = !statusFilter || product.stock_status === statusFilter;
+        
+        return matchSearch && matchCategory && matchStatus;
+    });
+    
+    renderStockTable(filtered);
+}
+
+// Initialize stock tracking event listeners
+function initStockTracking() {
+    $('#stock-search')?.addEventListener('input', filterStockData);
+    $('#stock-filter-category')?.addEventListener('change', filterStockData);
+    $('#stock-filter-status')?.addEventListener('change', filterStockData);
+    
+    $('#btn-clear-stock-filters')?.addEventListener('click', () => {
+        if ($('#stock-search')) $('#stock-search').value = '';
+        if ($('#stock-filter-category')) $('#stock-filter-category').value = '';
+        if ($('#stock-filter-status')) $('#stock-filter-status').value = '';
+        renderStockTable(allStockData);
+    });
+    
+    $('#btn-refresh-stock')?.addEventListener('click', loadStockTracking);
+}
+
+// Add to initialization
+document.addEventListener('DOMContentLoaded', () => {
+    initApp();
+    initStockTracking();
+});
+
+// ─── Total Selling Price Functions ─────────────────────────────────────────────
+
+function updateCartTotals() {
+    const totalBuying = cart.reduce((sum, item) => sum + (item.cost_price * item.quantity), 0);
+    const buyingTotalEl = $('#cart-buying-total');
+    if (buyingTotalEl) {
+        buyingTotalEl.textContent = formatPrice(totalBuying);
+    }
+    
+    // Update profit/loss when selling price changes
+    updateTotalProfit();
+}
+
+function updateTotalProfit() {
+    const totalBuying = cart.reduce((sum, item) => sum + (item.cost_price * item.quantity), 0);
+    const sellingPriceInput = $('#total-selling-price');
+    const profitAmountEl = $('#profit-amount');
+    const payBtn = $('#btn-pay');
+    
+    // Check if elements exist before updating them
+    if (!sellingPriceInput || !profitAmountEl || !payBtn) {
+        return;
+    }
+    
+    const totalSelling = parseFloat(sellingPriceInput.value) || 0;
+    const profitLoss = totalSelling - totalBuying;
+    
+    if (totalSelling === 0) {
+        profitAmountEl.textContent = 'KSh 0.00';
+        profitAmountEl.className = 'profit-amount';
+    } else if (profitLoss >= 0) {
+        profitAmountEl.textContent = formatPrice(profitLoss);
+        profitAmountEl.className = 'profit-amount text-profit';
+    } else {
+        profitAmountEl.textContent = '-' + formatPrice(Math.abs(profitLoss));
+        profitAmountEl.className = 'profit-amount text-loss';
+    }
+    
+    // Enable/disable pay button
+    payBtn.disabled = cart.length === 0 || totalSelling <= 0;
 }

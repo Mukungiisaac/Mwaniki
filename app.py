@@ -257,11 +257,11 @@ def add_product():
     data = request.get_json()
 
     # Validate required fields
-    if not all(k in data for k in ('name', 'category', 'cost_price', 'price', 'stock')):
+    if not all(k in data for k in ('name', 'category', 'cost_price', 'stock')):
         return jsonify({'error': 'Missing required fields'}), 400
 
-    price = float(data['price'])
     cost_price = float(data['cost_price'])
+    price = cost_price  # Set initial selling price same as cost price
 
     conn = get_db()
     cursor = conn.cursor()
@@ -280,28 +280,44 @@ def add_product():
 @login_required
 @role_required('admin')
 def update_product(product_id):
-
     """Update an existing product."""
-    data = request.get_json()
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
 
-    conn = get_db()
-    # Check if product exists
-    product = conn.execute('SELECT * FROM products WHERE id = ?', (product_id,)).fetchone()
-    if not product:
+        conn = get_db()
+        # Check if product exists
+        product = conn.execute('SELECT * FROM products WHERE id = ?', (product_id,)).fetchone()
+        if not product:
+            conn.close()
+            return jsonify({'error': 'Product not found'}), 404
+
+        # Get values with proper defaults
+        name = data.get('name', product['name'])
+        category = data.get('category', product['category'])
+        stock = int(data.get('stock', product['stock']))
+        
+        # Handle cost_price safely
+        if 'cost_price' in data:
+            cost_price = float(data['cost_price'])
+        else:
+            cost_price = float(product['cost_price']) if product['cost_price'] else 0
+            
+        price = cost_price  # Keep selling price same as cost price for consistency
+
+        conn.execute(
+            'UPDATE products SET name = ?, category = ?, price = ?, cost_price = ?, stock = ? WHERE id = ?',
+            (name, category, price, cost_price, stock, product_id)
+        )
+        conn.commit()
         conn.close()
-        return jsonify({'error': 'Product not found'}), 404
 
-    price = float(data.get('price', product['price']))
-    cost_price = float(data.get('cost_price', product.get('cost_price', 0)))
-
-    conn.execute(
-        'UPDATE products SET name = ?, category = ?, price = ?, cost_price = ?, stock = ? WHERE id = ?',
-        (data.get('name', product['name']), data.get('category', product['category']), price, cost_price, int(data.get('stock', product['stock'])), product_id)
-    )
-    conn.commit()
-    conn.close()
-
-    return jsonify({'message': 'Product updated successfully'})
+        return jsonify({'message': 'Product updated successfully'})
+        
+    except Exception as e:
+        return jsonify({'error': f'Update failed: {str(e)}'}), 500
 
 
 @app.route('/api/products/<int:product_id>', methods=['DELETE'])
@@ -601,6 +617,82 @@ def get_analytics():
         'daily_sales': [dict(r) for r in daily_sales],
         'monthly_sales': [dict(r) for r in monthly_sales],
         'payment_breakdown': [dict(r) for r in payment_breakdown]
+    })
+
+
+@app.route('/api/stock-tracking', methods=['GET'])
+@login_required
+def get_stock_tracking():
+    """
+    Return stock tracking data for all products:
+    - Initial stock (current stock + total sold)
+    - Total sold (from sales data)
+    - Current remaining stock
+    """
+    conn = get_db()
+    
+    # Get all products with current stock
+    products = conn.execute('SELECT * FROM products ORDER BY name').fetchall()
+    
+    stock_data = []
+    total_initial = 0
+    total_sold = 0
+    total_remaining = 0
+    
+    for product in products:
+        # Calculate total sold for this product
+        sold_query = conn.execute('''
+            SELECT COALESCE(SUM(si.quantity), 0) as total_sold
+            FROM sale_items si
+            WHERE si.product_id = ?
+        ''', (product['id'],)).fetchone()
+        
+        sold_quantity = sold_query['total_sold'] if sold_query else 0
+        current_stock = product['stock']
+        initial_stock = current_stock + sold_quantity
+        
+        # Determine stock status
+        if current_stock == 0:
+            stock_status = 'out-of-stock'
+            status_label = 'Out of Stock'
+            status_class = 'out-of-stock'
+        elif current_stock <= 5:
+            stock_status = 'low-stock'
+            status_label = f'{current_stock} left'
+            status_class = 'low-stock'
+        else:
+            stock_status = 'in-stock'
+            status_label = f'{current_stock} in stock'
+            status_class = 'in-stock'
+        
+        product_data = {
+            'id': product['id'],
+            'name': product['name'],
+            'category': product['category'],
+            'buying_price': product['cost_price'] or 0,
+            'initial_stock': initial_stock,
+            'sold_quantity': sold_quantity,
+            'current_stock': current_stock,
+            'stock_status': stock_status,
+            'status_label': status_label,
+            'status_class': status_class
+        }
+        
+        stock_data.append(product_data)
+        total_initial += initial_stock
+        total_sold += sold_quantity
+        total_remaining += current_stock
+    
+    conn.close()
+    
+    return jsonify({
+        'products': stock_data,
+        'summary': {
+            'total_products': len(products),
+            'total_initial': total_initial,
+            'total_sold': total_sold,
+            'total_remaining': total_remaining
+        }
     })
 
 
