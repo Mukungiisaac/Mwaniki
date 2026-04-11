@@ -1243,14 +1243,38 @@ function initProfileModal() {
             showToast(result.message);
             $('#profile-modal-overlay').classList.remove('visible');
             
-            // update header instantly
+            // update header profile images instantly
             if (photoFile) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    const headerImg = $('#header-avatar');
-                    if(headerImg) headerImg.src = e.target.result;
+                    const imageUrl = e.target.result;
+                    
+                    // Update desktop profile button image
+                    const desktopProfileImg = $('#btn-my-profile img');
+                    if(desktopProfileImg) desktopProfileImg.src = imageUrl;
+                    
+                    // Update mobile header profile button image
+                    const mobileHeaderProfileImg = $('#btn-my-profile-header img');
+                    if(mobileHeaderProfileImg) mobileHeaderProfileImg.src = imageUrl;
+                    
+                    // Update mobile sidebar profile button image (if exists)
+                    const mobileSidebarProfileImg = $('#btn-my-profile-mobile img');
+                    if(mobileSidebarProfileImg) mobileSidebarProfileImg.src = imageUrl;
                 }
                 reader.readAsDataURL(photoFile);
+            } else if (result.photo) {
+                // Fallback: update from server response if no local file
+                const timestamp = new Date().getTime(); // Cache busting
+                const photoUrl = `/static/uploads/${result.photo}?v=${timestamp}`;
+                
+                const desktopProfileImg = $('#btn-my-profile img');
+                if(desktopProfileImg) desktopProfileImg.src = photoUrl;
+                
+                const mobileHeaderProfileImg = $('#btn-my-profile-header img');
+                if(mobileHeaderProfileImg) mobileHeaderProfileImg.src = photoUrl;
+                
+                const mobileSidebarProfileImg = $('#btn-my-profile-mobile img');
+                if(mobileSidebarProfileImg) mobileSidebarProfileImg.src = photoUrl;
             }
             
             // If they are an admin and currently on the users tab, refresh the table so they see their own updates

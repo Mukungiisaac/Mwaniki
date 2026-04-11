@@ -738,8 +738,16 @@ def update_profile():
             (phone, id_number, session['user_id'])
         )
     conn.commit()
+    
+    # Get updated user data to return the new photo path
+    user = conn.execute('SELECT photo FROM users WHERE id = ?', (session['user_id'],)).fetchone()
     conn.close()
-    return jsonify({'message': 'Profile updated successfully'})
+    
+    response_data = {'message': 'Profile updated successfully'}
+    if user and user['photo']:
+        response_data['photo'] = user['photo']
+    
+    return jsonify(response_data)
 
 
 # ─── User API Routes (Admin Only) ──────────────────────────────────────────────
