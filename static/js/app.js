@@ -43,9 +43,19 @@ function initTabs() {
             tab.classList.add('active');
             $(`#tab-${tab.dataset.tab}`).classList.add('active');
             
-            // Close mobile menu if open
-            if ($('#main-nav')) {
-                $('#main-nav').classList.remove('open');
+            // Close mobile menu if open and reset icons
+            const mainNav = $('#main-nav');
+            const hamburgerIcon = $('#hamburger-icon');
+            const closeIcon = $('#close-icon');
+            const menuBtn = $('#btn-main-menu');
+            
+            if (mainNav && mainNav.classList.contains('open')) {
+                mainNav.classList.remove('open');
+                if (hamburgerIcon && closeIcon) {
+                    hamburgerIcon.style.display = 'block';
+                    closeIcon.style.display = 'none';
+                }
+                if (menuBtn) menuBtn.title = 'Menu';
             }
 
             // Refresh data when switching tabs
@@ -1310,12 +1320,77 @@ function initPasswordToggles() {
 
 // ─── Mobile Menu ───────────────────────────────────────────────────────────────
 function initMobileMenu() {
-    $('#btn-main-menu')?.addEventListener('click', () => {
-        $('#main-nav')?.classList.toggle('open');
+    const menuBtn = $('#btn-main-menu');
+    const mainNav = $('#main-nav');
+    const hamburgerIcon = $('#hamburger-icon');
+    const closeIcon = $('#close-icon');
+    
+    if (!menuBtn || !mainNav) return;
+    
+    // Toggle menu and icons
+    function toggleMenu() {
+        const isOpen = mainNav.classList.contains('open');
+        
+        if (isOpen) {
+            // Close menu
+            mainNav.classList.remove('open');
+            hamburgerIcon.style.display = 'block';
+            closeIcon.style.display = 'none';
+            menuBtn.title = 'Menu';
+        } else {
+            // Open menu
+            mainNav.classList.add('open');
+            hamburgerIcon.style.display = 'none';
+            closeIcon.style.display = 'block';
+            menuBtn.title = 'Close Menu';
+        }
+    }
+    
+    // Close menu function
+    function closeMenu() {
+        mainNav.classList.remove('open');
+        if (hamburgerIcon && closeIcon) {
+            hamburgerIcon.style.display = 'block';
+            closeIcon.style.display = 'none';
+        }
+        menuBtn.title = 'Menu';
+    }
+    
+    // Menu button click handler
+    menuBtn.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent event bubbling
+        toggleMenu();
     });
+    
+    // Close menu when clicking outside
+    document.addEventListener('click', (e) => {
+        const isMenuOpen = mainNav.classList.contains('open');
+        const isClickInsideMenu = mainNav.contains(e.target);
+        const isClickOnMenuButton = menuBtn.contains(e.target);
+        
+        if (isMenuOpen && !isClickInsideMenu && !isClickOnMenuButton) {
+            closeMenu();
+        }
+    });
+    
+    // Close menu when clicking on navigation tabs
+    $$('.nav-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            closeMenu();
+        });
+    });
+    
+    // Profile button handler
     $('#btn-my-profile-mobile')?.addEventListener('click', () => {
-        $('#main-nav')?.classList.remove('open');
+        closeMenu();
         $('#btn-my-profile')?.click();
+    });
+    
+    // Close menu on escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && mainNav.classList.contains('open')) {
+            closeMenu();
+        }
     });
 }
 
