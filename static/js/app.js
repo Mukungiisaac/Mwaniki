@@ -124,11 +124,11 @@ function initProductForm() {
         const data = {
             name: $('#product-name').value.trim(),
             category: $('#product-category').value,
-            price: parseFloat($('#product-price').value),
+            cost_price: parseFloat($('#product-price').value),
+            price: parseFloat($('#product-selling-price').value),
             stock: parseInt($('#product-stock').value)
         };
-        // cost_price is automatically synced with price in the backend
-        if (!data.name || !data.category || isNaN(data.price) || isNaN(data.stock)) {
+        if (!data.name || !data.category || isNaN(data.cost_price) || isNaN(data.price) || isNaN(data.stock)) {
             showToast('Please fill in all fields correctly', 'warning');
             return;
         }
@@ -153,7 +153,8 @@ function editProduct(id) {
     editingProductId = id;
     $('#product-name').value = product.name;
     $('#product-category').value = product.category;
-    $('#product-price').value = product.price;
+    $('#product-price').value = product.cost_price || 0;
+    $('#product-selling-price').value = product.price;
     $('#product-stock').value = product.stock;
     $('#form-title').innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit Product`;
     $('#btn-save-product').innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Update Product`;
@@ -192,7 +193,7 @@ function loadProductsTable() {
             <td>#${p.id}</td>
             <td><strong>${escHtml(p.name)}</strong></td>
             <td>${escHtml(p.category)}</td>
-            <td>${formatPrice(p.price)}</td>
+            <td>${formatPrice(p.cost_price || 0)}</td>
             <td><span class="stock-badge ${stockClass}">${stockLabel}</span></td>
             <td><div class="action-btns">
                 <button class="btn-edit" onclick="editProduct(${p.id})" title="Edit">
@@ -237,7 +238,7 @@ function renderPOSGrid() {
             <div class="pos-card-category">${escHtml(p.category)}</div>
             <div class="pos-card-name">${escHtml(p.name)}</div>
             <div class="pos-card-bottom">
-                <div class="pos-card-price">${formatPrice(p.price)}</div>
+                <div class="pos-card-price">${formatPrice(p.cost_price || 0)}</div>
                 <div class="pos-card-stock ${low ? 'low' : ''}">${oos ? 'Out of stock' : p.stock + ' in stock'}</div>
             </div>
         </div>`;
@@ -267,7 +268,7 @@ function openQtyModal(productId) {
     if (!product || product.stock === 0) return;
     qtyProductId = productId;
     $('#qty-modal-title').textContent = product.name;
-    $('#qty-modal-info').textContent = `${formatPrice(product.price)} · ${product.stock} in stock`;
+    $('#qty-modal-info').textContent = `${formatPrice(product.cost_price || 0)} · ${product.stock} in stock`;
     $('#qty-input').value = 1;
     $('#qty-input').max = product.stock;
     $('#qty-modal-overlay').classList.add('visible');
@@ -319,11 +320,11 @@ function updateCartPrice(productId, newPrice) {
     const itemEl = $(`.cart-item[data-id="${productId}"]`);
     if (itemEl) {
         const profitEl = itemEl.querySelector('.cart-item-profit');
-        // Calculate Discount/Loss relative to retail price
-        const discountProfit = (item.price - item.retail_price) * item.quantity;
-        const profitClass = discountProfit >= 0 ? 'text-profit' : 'text-loss';
+        // Calculate Profit/Loss relative to cost price (actual profit)
+        const actualProfit = (item.price - item.cost_price) * item.quantity;
+        const profitClass = actualProfit >= 0 ? 'text-profit' : 'text-loss';
         profitEl.className = `cart-item-profit ${profitClass}`;
-        profitEl.textContent = (discountProfit >= 0 ? 'Profit: ' : 'Loss: ') + formatPrice(Math.abs(discountProfit));
+        profitEl.textContent = (actualProfit >= 0 ? 'Profit: ' : 'Loss: -') + formatPrice(Math.abs(actualProfit));
         
         const itemTotalEl = itemEl.querySelector('.cart-item-total');
         if (itemTotalEl) {
@@ -428,9 +429,9 @@ function renderCart() {
                     <input type="number" step="0.01" class="cart-price-input" value="${item.price}" 
                         oninput="updateCartPrice(${item.product_id}, this.value)" 
                         title="Set selling price">
-                    <div class="cart-item-profit ${item.price >= item.retail_price ? 'text-profit' : 'text-loss'}">
-                        ${(item.price - item.retail_price) >= 0 ? 'Profit' : 'Loss'}: 
-                        ${formatPrice(Math.abs((item.price - item.retail_price) * item.quantity))}
+                    <div class="cart-item-profit ${item.price >= item.cost_price ? 'text-profit' : 'text-loss'}">
+                        ${(item.price - item.cost_price) >= 0 ? 'Profit' : 'Loss'}: 
+                        ${(item.price - item.cost_price) >= 0 ? '' : '-'}${formatPrice(Math.abs((item.price - item.cost_price) * item.quantity))}
                     </div>
                 </div>
             </div>
@@ -574,7 +575,7 @@ async function loadAnalytics() {
         $('#kpi-sales').textContent   = data.count;
         
         // Profit cards
-        $('#kpi-gross-profit').textContent = formatPrice(data.total_net_profit);
+        $('#kpi-gross-profit').textContent = (data.total_net_profit >= 0 ? '' : '-') + formatPrice(Math.abs(data.total_net_profit));
         $('#kpi-discount-loss').textContent = formatPrice(data.total_discount_loss);
 
         // Apply color classes to Gross Profit (Actual)
@@ -860,14 +861,30 @@ function renderSalesTable(sales) {
     tbody.innerHTML = sales.map(sale => {
         const pmClass = sale.payment_method === 'M-Pesa' ? 'pm-mpesa' : 'pm-cash';
         const itemCount = sale.items ? sale.items.length : 0;
+        
+        // Calculate total buying price and selling price
+        let totalBuyingPrice = 0;
+        let totalSellingPrice = 0;
+        if (sale.items) {
+            sale.items.forEach(item => {
+                totalBuyingPrice += (item.cost_price || 0) * item.quantity;
+                totalSellingPrice += item.price * item.quantity;
+            });
+        }
+        
+        // Calculate profit or loss
+        const profitLoss = totalSellingPrice - totalBuyingPrice;
+        const profitLossClass = profitLoss >= 0 ? 'text-profit' : 'text-loss';
+        const profitLossText = profitLoss >= 0 ? 'Profit: ' : 'Loss: -';
+        
         return `<tr>
             <td><strong>#${sale.id}</strong></td>
             <td>${escHtml(sale.date)}</td>
             <td><span class="item-count-badge">${itemCount} item${itemCount !== 1 ? 's' : ''}</span></td>
             <td><span class="pm-badge ${pmClass}">${escHtml(sale.payment_method || 'Cash')}</span></td>
-            <td><strong style="color:var(--primary-400)">${formatPrice(sale.total_amount)}</strong></td>
-            <td><span class="text-loss">${formatPrice(sale.total_discount_loss || 0)}</span></td>
-            <td><span class="${(sale.total_net_profit || 0) >= 0 ? 'text-profit' : 'text-loss'}">${formatPrice(sale.total_net_profit || 0)}</span></td>
+            <td><strong style="color:var(--text-muted)">${formatPrice(totalBuyingPrice)}</strong></td>
+            <td><strong style="color:var(--primary-400)">${formatPrice(totalSellingPrice)}</strong></td>
+            <td><span class="${profitLossClass}">${profitLossText}${formatPrice(Math.abs(profitLoss))}</span></td>
             <td>
                 <button class="btn-view-detail" onclick="openSaleDetail(${sale.id})">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -926,7 +943,7 @@ async function openSaleDetail(saleId) {
                 <td style="text-align:center">${i.quantity}</td>
                 <td>${formatPrice(i.cost_price || 0)}</td>
                 <td>${formatPrice(i.price)}</td>
-                <td class="${profitClass}">${formatPrice(profit)}</td>
+                <td class="${profitClass}">${profit >= 0 ? '' : '-'}${formatPrice(Math.abs(profit))}</td>
                 <td><strong style="color:var(--primary-400)">${formatPrice(i.price * i.quantity)}</strong></td>
             </tr>
             `;
@@ -940,7 +957,7 @@ async function openSaleDetail(saleId) {
         if (totalRow) {
             totalRow.innerHTML = `
                 <div style="display:flex; flex-direction:column; align-items:flex-end;">
-                    <div style="font-size:0.9rem; color:var(--text-muted);">Total Profit: <span class="${totalProfitClass}">${formatPrice(totalProfit)}</span></div>
+                    <div style="font-size:0.9rem; color:var(--text-muted);">Total Profit: <span class="${totalProfitClass}">${totalProfit >= 0 ? '' : '-'}${formatPrice(Math.abs(totalProfit))}</span></div>
                     <div style="margin-top:0.3rem;">Grand Total: <span id="detail-total" class="detail-grand-total">${formatPrice(sale.total_amount)}</span></div>
                 </div>
             `;
@@ -1337,9 +1354,8 @@ async function loadMonthlyAnalytics() {
                     <td><strong>${m.month}</strong></td>
                     <td>${m.count}</td>
                     <td>${formatPrice(m.revenue)}</td>
-                    <td class="text-profit">${formatPrice(m.gross_profit)}</td>
-                    <td class="text-loss">${formatPrice(m.discount_loss)}</td>
-                    <td class="${m.net_profit >= 0 ? 'text-profit' : 'text-loss'}">${formatPrice(m.net_profit)}</td>
+                    <td class="text-loss">-${formatPrice(m.discount_loss)}</td>
+                    <td class="${m.net_profit >= 0 ? 'text-profit' : 'text-loss'}">${m.net_profit >= 0 ? '' : '-'}${formatPrice(Math.abs(m.net_profit))}</td>
                 </tr>
             `).join('');
         }
@@ -1364,7 +1380,7 @@ async function loadMonthlyAnalytics() {
                     </div>
                     <div class="kpi-info">
                         <span class="kpi-label">Month Net Profit</span>
-                        <span class="kpi-value ${currentMonth.net_profit >= 0 ? 'text-profit' : 'text-loss'}">${formatPrice(currentMonth.net_profit)}</span>
+                        <span class="kpi-value ${currentMonth.net_profit >= 0 ? 'text-profit' : 'text-loss'}">${currentMonth.net_profit >= 0 ? '' : '-'}${formatPrice(Math.abs(currentMonth.net_profit))}</span>
                     </div>
                 </div>
                 <div class="kpi-card">

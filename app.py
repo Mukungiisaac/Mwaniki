@@ -256,12 +256,12 @@ def add_product():
     """Add a new product to the database."""
     data = request.get_json()
 
-    # Validate required fields (cost_price is now optional and will sync with price)
-    if not all(k in data for k in ('name', 'category', 'price', 'stock')):
+    # Validate required fields
+    if not all(k in data for k in ('name', 'category', 'cost_price', 'price', 'stock')):
         return jsonify({'error': 'Missing required fields'}), 400
 
     price = float(data['price'])
-    cost_price = float(data.get('cost_price', price))
+    cost_price = float(data['cost_price'])
 
     conn = get_db()
     cursor = conn.cursor()
@@ -292,7 +292,7 @@ def update_product(product_id):
         return jsonify({'error': 'Product not found'}), 404
 
     price = float(data.get('price', product['price']))
-    cost_price = float(data.get('cost_price', price))
+    cost_price = float(data.get('cost_price', product.get('cost_price', 0)))
 
     conn.execute(
         'UPDATE products SET name = ?, category = ?, price = ?, cost_price = ?, stock = ? WHERE id = ?',
@@ -380,7 +380,6 @@ def process_sale():
         )
         sale_id = cursor.lastrowid
 
-        sale_total_gross_profit = 0
         sale_total_discount_loss = 0
         sale_total_net_profit = 0
 
@@ -395,26 +394,20 @@ def process_sale():
             sold_price = float(item['price'])
             qty = int(item['quantity'])
 
-            # NEW Logic:
-            # Gross = potential (retail - cost) OR actual (sold - cost), whichever is higher
-            # Loss = reduction from retail (retail - sold, but min 0)
-            # Net = actual (sold - cost)
-            potential_item_profit = (retail_price - cost_price) * qty
-            actual_item_profit = (sold_price - cost_price) * qty
+            # SIMPLIFIED Logic: Profit = (selling_price - cost_price) * quantity
+            item_profit = (sold_price - cost_price) * qty
             
-            item_gross_profit = max(potential_item_profit, actual_item_profit)
+            # Discount loss is the difference between retail and selling price (if selling below retail)
             item_discount_loss = max(0, (retail_price - sold_price) * qty)
-            item_net_profit = actual_item_profit
-
-            sale_total_gross_profit += item_gross_profit
+            
+            sale_total_net_profit += item_profit
             sale_total_discount_loss += item_discount_loss
-            sale_total_net_profit += item_net_profit
 
             cursor.execute(
                 '''INSERT INTO sale_items 
                    (sale_id, product_id, quantity, price, cost_price, profit_per_item, total_profit) 
                    VALUES (?, ?, ?, ?, ?, ?, ?)''',
-                (sale_id, item['product_id'], qty, sold_price, cost_price, (sold_price - retail_price), item_net_profit)
+                (sale_id, item['product_id'], qty, sold_price, cost_price, (sold_price - cost_price), item_profit)
             )
             # Reduce stock
             cursor.execute(
@@ -423,8 +416,8 @@ def process_sale():
             )
 
         cursor.execute(
-            'UPDATE sales SET total_profit = ?, total_gross_profit = ?, total_discount_loss = ?, total_net_profit = ? WHERE id = ?', 
-            (sale_total_net_profit, sale_total_gross_profit, sale_total_discount_loss, sale_total_net_profit, sale_id)
+            'UPDATE sales SET total_profit = ?, total_discount_loss = ?, total_net_profit = ? WHERE id = ?', 
+            (sale_total_net_profit, sale_total_discount_loss, sale_total_net_profit, sale_id)
         )
 
         conn.commit()
@@ -550,7 +543,6 @@ def get_analytics():
     summary_row = conn.execute(
         '''SELECT 
             COALESCE(SUM(total_amount), 0) as revenue, 
-            COALESCE(SUM(total_gross_profit), 0) as total_gross_profit,
             COALESCE(SUM(total_discount_loss), 0) as total_discount_loss,
             COALESCE(SUM(total_net_profit), 0) as total_net_profit,
             COUNT(*) as count FROM sales'''
@@ -583,7 +575,6 @@ def get_analytics():
     monthly_sales = conn.execute('''
         SELECT strftime('%Y-%m', date) as month,
                SUM(total_amount) as revenue,
-               SUM(total_gross_profit) as gross_profit,
                SUM(total_discount_loss) as discount_loss,
                SUM(total_net_profit) as net_profit,
                COUNT(*) as count
@@ -603,7 +594,6 @@ def get_analytics():
     conn.close()
     return jsonify({
         'revenue': summary.get('revenue', 0),
-        'total_gross_profit': summary.get('total_gross_profit', 0),
         'total_discount_loss': summary.get('total_discount_loss', 0),
         'total_net_profit': summary.get('total_net_profit', 0),
         'count': summary.get('count', 0),

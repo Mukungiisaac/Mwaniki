@@ -8,8 +8,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/style.css?v=3">
-    <link rel="stylesheet" href="/static/css/print.css" media="print">
+    <link rel="stylesheet" href="/static/css/style.css?v=5">
+    <link rel="stylesheet" href="/static/css/print.css?v=3" media="print">
 </head>
 <body>
     <div id="app-container">
@@ -221,8 +221,12 @@
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label for="product-price">Buying Price (KSh)</label>
+                                <label for="product-price">Cost Price (KSh)</label>
                                 <input type="number" id="product-price" placeholder="0.00" min="0" step="0.01" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="product-selling-price">Selling Price (KSh)</label>
+                                <input type="number" id="product-selling-price" placeholder="0.00" min="0" step="0.01" required>
                             </div>
                             <div class="form-group">
                                 <label for="product-stock">Stock Quantity</label>
@@ -255,7 +259,7 @@
                                     <th>ID</th>
                                     <th>Name</th>
                                     <th>Category</th>
-                                    <th>Buying Price (KSh)</th>
+                                    <th>Cost Price (KSh)</th>
                                     <th>Stock</th>
                                     <th>Actions</th>
                                 </tr>
@@ -429,9 +433,9 @@
                                 <th>Date & Time</th>
                                 <th>Items</th>
                                 <th>Payment</th>
-                                <th>Total</th>
-                                <th>Loss (Discounts)</th>
-                                <th>Profit (Actual)</th>
+                                <th>Buying Price</th>
+                                <th>Selling Price</th>
+                                <th>Profit/Loss</th>
                                 <th>Action</th>
                             </tr>
                         </thead>
@@ -773,6 +777,6 @@
             }
         }
     </script>
-    <script src="/static/js/app.js"></script>
+    <script src="/static/js/app.js?v=3"></script>
 </body>
 </html>
