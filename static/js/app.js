@@ -1182,7 +1182,26 @@ function loadUsersTable() {
 // ─── Profile Logic ─────────────────────────────────────────────────────────────
 
 function initProfileModal() {
+    // Desktop profile button
     $('#btn-my-profile')?.addEventListener('click', async () => {
+        try {
+            const res = await fetch('/api/users/profile');
+            const data = await res.json();
+            if(!res.ok) throw new Error(data.error);
+            $('#profile-phone').value = data.phone || '';
+            $('#profile-id-number').value = data.id_number || '';
+            
+            if ($('#profile-photo-preview')) {
+                $('#profile-photo-preview').src = data.photo ? `/static/uploads/${data.photo}` : '/static/uploads/default.png';
+            }
+            $('#profile-modal-overlay').classList.add('visible');
+        } catch(err) {
+            showToast(err.message || 'Failed to load profile', 'error');
+        }
+    });
+    
+    // Mobile header profile button
+    $('#btn-my-profile-header')?.addEventListener('click', async () => {
         try {
             const res = await fetch('/api/users/profile');
             const data = await res.json();

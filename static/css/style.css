@@ -1554,15 +1554,41 @@ a {
         /* Hide text name/role in tight mobile header, but keep avatar */
     }
 
-    #btn-my-profile span,
+    /* Keep profile photo visible but hide text on very small screens */
+    #btn-my-profile span {
+        display: none;
+        /* Photo only for profile button to save space */
+    }
+    
+    /* Mobile header profile button - keep both photo and text visible */
+    #btn-my-profile-header span {
+        display: inline;
+        font-size: 0.85rem;
+    }
+    
     .btn-logout span {
         display: none;
-        /* Icons only for these specific buttons to save space */
+        /* Icon only for logout button to save space */
     }
 
     #btn-my-profile {
         margin-right: 0 !important;
         padding: 0.5rem !important;
+    }
+    
+    #btn-my-profile img {
+        width: 24px !important;
+        height: 24px !important;
+    }
+    
+    #btn-my-profile-header {
+        padding: 0.4rem 0.6rem !important;
+        font-size: 0.85rem;
+    }
+    
+    #btn-my-profile-header img {
+        width: 22px !important;
+        height: 22px !important;
     }
 
     .btn-logout {
@@ -1954,6 +1980,41 @@ a {
         flex-direction: column;
         gap: 0.2rem;
     }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   PROFILE BUTTON ENHANCEMENTS
+   ══════════════════════════════════════════════════════════════════════════ */
+#btn-my-profile img,
+#btn-my-profile-mobile img,
+#btn-my-profile-header img {
+    border: 1px solid var(--border-subtle);
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+}
+
+#btn-my-profile:hover img,
+#btn-my-profile-mobile:hover img,
+#btn-my-profile-header:hover img {
+    border-color: var(--primary-400);
+    transform: scale(1.05);
+}
+
+#btn-my-profile-header {
+    color: var(--text-primary);
+    font-weight: 500;
+    transition: all var(--transition-fast);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    display: none; /* Hidden by default, shown on mobile */
+    align-items: center;
+    gap: 0.4rem;
+}
+
+#btn-my-profile-header:hover {
+    background: rgba(255, 255, 255, 0.1) !important;
+    border-color: var(--border-subtle);
+    transform: translateY(-1px);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -2905,6 +2966,32 @@ a {
     display: none !important;
 }
 
+/* Force mobile profile button visibility on smaller screens */
+@media(max-width: 768px) {
+    #btn-my-profile-header {
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.4rem !important;
+        margin-right: 0.5rem !important;
+        padding: 0.4rem 0.6rem !important;
+        border: none !important;
+        background: transparent !important;
+        color: var(--text-primary) !important;
+    }
+    
+    #btn-my-profile-header img {
+        width: 22px !important;
+        height: 22px !important;
+        border-radius: 50% !important;
+        object-fit: cover !important;
+    }
+    
+    #btn-my-profile-header span {
+        font-size: 0.85rem !important;
+        font-weight: 500 !important;
+    }
+}
+
 @media(max-width: 1024px) {
     .desktop-only {
         display: none !important;
@@ -2912,6 +2999,14 @@ a {
     .mobile-only {
         display: flex !important;
     }
+    
+    /* Ensure mobile profile button is visible */
+    #btn-my-profile-header {
+        display: flex !important;
+        align-items: center !important;
+        gap: 0.4rem !important;
+    }
+    
     .header-stats {
         display: none !important;
     }
