@@ -990,7 +990,8 @@ a {
 }
 
 #products-table,
-#users-table {
+#users-table,
+#monthly-table {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.85rem;
@@ -998,7 +999,8 @@ a {
 }
 
 #products-table thead th,
-#users-table thead th {
+#users-table thead th,
+#monthly-table thead th {
     text-align: left;
     padding: 0.7rem 1rem;
     font-weight: 600;
@@ -1011,7 +1013,8 @@ a {
 }
 
 #products-table tbody tr,
-#users-table tbody tr {
+#users-table tbody tr,
+#monthly-table tbody tr {
     transition: background var(--transition-fast)
 }
 
@@ -1021,8 +1024,9 @@ a {
 }
 
 #products-table tbody td,
-#users-table tbody td {
-    padding: 0.7rem 1rem;
+#users-table tbody td,
+#monthly-table tbody td {
+    padding: 1rem 1.25rem;
     border-bottom: 1px solid var(--border-subtle);
     white-space: nowrap
 }

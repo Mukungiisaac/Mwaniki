@@ -52,6 +52,7 @@ function initTabs() {
             if (tab.dataset.tab === 'products') loadProductsTable();
             if (tab.dataset.tab === 'sales') loadSalesHistory();
             if (tab.dataset.tab === 'pos') renderPOSGrid();
+            if (tab.dataset.tab === 'monthly') loadMonthlyAnalytics();
             if (tab.dataset.tab === 'users') {
                 await fetchUsers();
                 loadUsersTable();
@@ -123,18 +124,13 @@ function initProductForm() {
         const data = {
             name: $('#product-name').value.trim(),
             category: $('#product-category').value,
-            cost_price: parseFloat($('#product-cost').value),
             price: parseFloat($('#product-price').value),
             stock: parseInt($('#product-stock').value)
         };
-        if (!data.name || !data.category || isNaN(data.price) || isNaN(data.cost_price) || isNaN(data.stock)) {
+        // cost_price is automatically synced with price in the backend
+        if (!data.name || !data.category || isNaN(data.price) || isNaN(data.stock)) {
             showToast('Please fill in all fields correctly', 'warning');
             return;
-        }
-        if (data.price < data.cost_price) {
-            if (!confirm('Selling price is lower than cost price. This will result in a loss. Continue?')) {
-                return;
-            }
         }
         saveProduct(data);
     });
@@ -157,7 +153,6 @@ function editProduct(id) {
     editingProductId = id;
     $('#product-name').value = product.name;
     $('#product-category').value = product.category;
-    $('#product-cost').value = product.cost_price || 0;
     $('#product-price').value = product.price;
     $('#product-stock').value = product.stock;
     $('#form-title').innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit Product`;
@@ -197,7 +192,6 @@ function loadProductsTable() {
             <td>#${p.id}</td>
             <td><strong>${escHtml(p.name)}</strong></td>
             <td>${escHtml(p.category)}</td>
-            <td>${formatPrice(p.cost_price || 0)}</td>
             <td>${formatPrice(p.price)}</td>
             <td><span class="stock-badge ${stockClass}">${stockLabel}</span></td>
             <td><div class="action-btns">
@@ -325,11 +319,11 @@ function updateCartPrice(productId, newPrice) {
     const itemEl = $(`.cart-item[data-id="${productId}"]`);
     if (itemEl) {
         const profitEl = itemEl.querySelector('.cart-item-profit');
-        // Calculate Actual Net Profit: Sold - Cost
-        const actualProfit = (item.price - item.cost_price) * item.quantity;
-        const profitClass = actualProfit >= 0 ? 'text-profit' : 'text-loss';
+        // Calculate Discount/Loss relative to retail price
+        const discountProfit = (item.price - item.retail_price) * item.quantity;
+        const profitClass = discountProfit >= 0 ? 'text-profit' : 'text-loss';
         profitEl.className = `cart-item-profit ${profitClass}`;
-        profitEl.textContent = (actualProfit >= 0 ? 'Profit: ' : 'Loss: ') + formatPrice(Math.abs(actualProfit));
+        profitEl.textContent = (discountProfit >= 0 ? 'Profit: ' : 'Loss: ') + formatPrice(Math.abs(discountProfit));
         
         const itemTotalEl = itemEl.querySelector('.cart-item-total');
         if (itemTotalEl) {
@@ -579,10 +573,9 @@ async function loadAnalytics() {
         $('#kpi-revenue').textContent = formatPrice(data.revenue);
         $('#kpi-sales').textContent   = data.count;
         
-        // Profit cards (Updated: Interchanged Gross and Net as requested)
-        $('#kpi-gross-profit').textContent = formatPrice(data.total_net_profit); // Show Actual in Gross
+        // Profit cards
+        $('#kpi-gross-profit').textContent = formatPrice(data.total_net_profit);
         $('#kpi-discount-loss').textContent = formatPrice(data.total_discount_loss);
-        $('#kpi-net-profit').textContent = formatPrice(data.total_gross_profit); // Show Potential in Net
 
         // Apply color classes to Gross Profit (Actual)
         const grossProfitEl = $('#kpi-gross-profit');
@@ -873,7 +866,8 @@ function renderSalesTable(sales) {
             <td><span class="item-count-badge">${itemCount} item${itemCount !== 1 ? 's' : ''}</span></td>
             <td><span class="pm-badge ${pmClass}">${escHtml(sale.payment_method || 'Cash')}</span></td>
             <td><strong style="color:var(--primary-400)">${formatPrice(sale.total_amount)}</strong></td>
-            <td><span class="${(sale.total_profit || 0) >= 0 ? 'text-profit' : 'text-loss'}">${formatPrice(sale.total_profit || 0)}</span></td>
+            <td><span class="text-loss">${formatPrice(sale.total_discount_loss || 0)}</span></td>
+            <td><span class="${(sale.total_net_profit || 0) >= 0 ? 'text-profit' : 'text-loss'}">${formatPrice(sale.total_net_profit || 0)}</span></td>
             <td>
                 <button class="btn-view-detail" onclick="openSaleDetail(${sale.id})">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -1316,4 +1310,145 @@ async function deleteSale(saleId) {
     } catch (err) {
         showToast('Connection error while deleting sale', 'error');
     }
+}
+
+// ─── Monthly Profit Analytics ──────────────────────────────────────────────────
+let monthlyProfitChartInstance = null;
+
+async function loadMonthlyAnalytics() {
+    try {
+        const res = await fetch('/api/analytics');
+        const data = await res.json();
+        
+        const monthlySales = data.monthly_sales || [];
+        
+        // 1. Render Table
+        const tbody = $('#monthly-table-body');
+        const emptyEl = $('#monthly-empty');
+        if (monthlySales.length === 0) {
+            tbody.innerHTML = '';
+            if (emptyEl) emptyEl.style.display = 'flex';
+            if($('#monthly-table')) $('#monthly-table').closest('.table-wrapper').style.display = 'none';
+        } else {
+            if (emptyEl) emptyEl.style.display = 'none';
+            if($('#monthly-table')) $('#monthly-table').closest('.table-wrapper').style.display = 'block';
+            tbody.innerHTML = monthlySales.map(m => `
+                <tr>
+                    <td><strong>${m.month}</strong></td>
+                    <td>${m.count}</td>
+                    <td>${formatPrice(m.revenue)}</td>
+                    <td class="text-profit">${formatPrice(m.gross_profit)}</td>
+                    <td class="text-loss">${formatPrice(m.discount_loss)}</td>
+                    <td class="${m.net_profit >= 0 ? 'text-profit' : 'text-loss'}">${formatPrice(m.net_profit)}</td>
+                </tr>
+            `).join('');
+        }
+        
+        // 2. Render KPI Cards for current month
+        const currentMonth = monthlySales[0] || { revenue: 0, gross_profit: 0, discount_loss: 0, net_profit: 0, count: 0 };
+        const kpiRow = $('#monthly-kpi-row');
+        if (kpiRow) {
+            kpiRow.innerHTML = `
+                <div class="kpi-card">
+                    <div class="kpi-icon kpi-revenue">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    </div>
+                    <div class="kpi-info">
+                        <span class="kpi-label">Revenue (${currentMonth.month || 'Current'})</span>
+                        <span class="kpi-value">${formatPrice(currentMonth.revenue)}</span>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-icon kpi-profit" style="background: rgba(16, 185, 129, 0.15); color: #10b981;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22m5-18H7c-1.5 0-3 1.2-3 2.5S5.5 10 7 10h10c1.5 0 3 1.2 3 2.5S18.5 15 17 15H7m5-14v14"/></svg>
+                    </div>
+                    <div class="kpi-info">
+                        <span class="kpi-label">Month Net Profit</span>
+                        <span class="kpi-value ${currentMonth.net_profit >= 0 ? 'text-profit' : 'text-loss'}">${formatPrice(currentMonth.net_profit)}</span>
+                    </div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-icon kpi-sales">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    </div>
+                    <div class="kpi-info">
+                        <span class="kpi-label">Month Sales</span>
+                        <span class="kpi-value">${currentMonth.count}</span>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // 3. Render Chart
+        renderMonthlyProfitChart(monthlySales);
+        
+    } catch (err) {
+        showToast('Failed to load monthly analytics', 'error');
+        console.error(err);
+    }
+}
+
+function renderMonthlyProfitChart(monthlySales) {
+    const canvas = $('#chart-monthly-profit');
+    if (!canvas) return;
+    
+    // Reverse for chronological order in chart
+    const chartData = [...monthlySales].reverse();
+    const labels = chartData.map(m => m.month);
+    const profits = chartData.map(m => m.net_profit);
+    const revenues = chartData.map(m => m.revenue);
+    
+    if (monthlyProfitChartInstance) monthlyProfitChartInstance.destroy();
+    
+    monthlyProfitChartInstance = new Chart(canvas, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Net Profit (KSh)',
+                    data: profits,
+                    backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                    borderColor: '#10b981',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    order: 2
+                },
+                {
+                    label: 'Total Revenue (KSh)',
+                    data: revenues,
+                    type: 'line',
+                    borderColor: '#ffc107',
+                    backgroundColor: 'rgba(255, 193, 7, 0.1)',
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    tension: 0.3,
+                    fill: false,
+                    order: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: { color: '#f0f1f5' }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: ctx => ctx.dataset.label + ': ' + formatPrice(ctx.parsed.y)
+                    }
+                }
+            },
+            scales: {
+                x: { ticks: { color: '#636b7e' }, grid: { display: false } },
+                y: { 
+                    ticks: { color: '#636b7e', callback: v => 'KSh ' + Number(v).toLocaleString() },
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    beginAtZero: true
+                }
+            }
+        }
+    });
 }

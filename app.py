@@ -256,15 +256,18 @@ def add_product():
     """Add a new product to the database."""
     data = request.get_json()
 
-    # Validate required fields
-    if not all(k in data for k in ('name', 'category', 'price', 'cost_price', 'stock')):
+    # Validate required fields (cost_price is now optional and will sync with price)
+    if not all(k in data for k in ('name', 'category', 'price', 'stock')):
         return jsonify({'error': 'Missing required fields'}), 400
+
+    price = float(data['price'])
+    cost_price = float(data.get('cost_price', price))
 
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
         'INSERT INTO products (name, category, price, cost_price, stock) VALUES (?, ?, ?, ?, ?)',
-        (data['name'], data['category'], float(data['price']), float(data['cost_price']), int(data['stock']))
+        (data['name'], data['category'], price, cost_price, int(data['stock']))
     )
     conn.commit()
     product_id = cursor.lastrowid
@@ -288,9 +291,12 @@ def update_product(product_id):
         conn.close()
         return jsonify({'error': 'Product not found'}), 404
 
+    price = float(data.get('price', product['price']))
+    cost_price = float(data.get('cost_price', price))
+
     conn.execute(
         'UPDATE products SET name = ?, category = ?, price = ?, cost_price = ?, stock = ? WHERE id = ?',
-        (data['name'], data['category'], float(data['price']), float(data['cost_price']), int(data['stock']), product_id)
+        (data.get('name', product['name']), data.get('category', product['category']), price, cost_price, int(data.get('stock', product['stock'])), product_id)
     )
     conn.commit()
     conn.close()
@@ -573,6 +579,20 @@ def get_analytics():
         ORDER BY day ASC
     ''').fetchall()
 
+    # Monthly sales for breakdown (last 12 months)
+    monthly_sales = conn.execute('''
+        SELECT strftime('%Y-%m', date) as month,
+               SUM(total_amount) as revenue,
+               SUM(total_gross_profit) as gross_profit,
+               SUM(total_discount_loss) as discount_loss,
+               SUM(total_net_profit) as net_profit,
+               COUNT(*) as count
+        FROM sales
+        GROUP BY month
+        ORDER BY month DESC
+        LIMIT 12
+    ''').fetchall()
+
     # Payment method breakdown
     payment_breakdown = conn.execute('''
         SELECT payment_method, COUNT(*) as count, SUM(total_amount) as total
@@ -589,6 +609,7 @@ def get_analytics():
         'count': summary.get('count', 0),
         'best_sellers': [dict(r) for r in best_sellers],
         'daily_sales': [dict(r) for r in daily_sales],
+        'monthly_sales': [dict(r) for r in monthly_sales],
         'payment_breakdown': [dict(r) for r in payment_breakdown]
     })
 
