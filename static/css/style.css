@@ -3071,7 +3071,7 @@ a {
     }
 
     #app-main {
-        padding-top: 85px; /* Since horizontal nav is hidden, we don't need large padding here */
+        padding-top: 110px; /* Increased padding to prevent header overlap on mobile */
     }
 
     #app-footer {
@@ -3245,4 +3245,43 @@ a {
     border-radius: 4px;
     font-size: 0.8rem;
     font-weight: 500;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   MOBILE SPACING FIXES
+   ══════════════════════════════════════════════════════════════════════════ */
+@media(max-width: 768px) {
+    #app-main {
+        padding-top: 120px !important; /* Extra padding for smaller mobile screens */
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
+    
+    /* Ensure first content elements have proper spacing */
+    .tab-content > *:first-child {
+        margin-top: 0;
+    }
+    
+    /* KPI cards spacing on mobile */
+    .kpi-row {
+        margin-top: 0;
+        padding-top: 0;
+    }
+    
+    /* Stock tracking table spacing */
+    .stock-table-card {
+        margin-top: 1rem;
+    }
+    
+    /* Ensure proper spacing for all content sections */
+    .tab-content {
+        padding-top: 0;
+    }
+}
+
+/* Additional mobile fixes for very small screens */
+@media(max-width: 480px) {
+    #app-main {
+        padding-top: 130px !important; /* Even more padding for very small screens */
+    }
 }
