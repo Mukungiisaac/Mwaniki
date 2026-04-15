@@ -3285,3 +3285,145 @@ a {
         padding-top: 130px !important; /* Even more padding for very small screens */
     }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CART SELLER INPUT
+   ══════════════════════════════════════════════════════════════════════════ */
+.cart-seller-input {
+    margin-bottom: 1rem;
+    padding: 0.9rem 1rem;
+    background: var(--bg-surface);
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    position: relative;
+    overflow: hidden;
+}
+
+.cart-seller-input::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #6366f1, #8b5cf6);
+}
+
+.cart-seller-input label {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.5rem;
+}
+
+.cart-seller-input label svg {
+    color: #6366f1;
+}
+
+.cart-seller-input input {
+    width: 100%;
+    padding: 0.65rem 0.9rem;
+    background: var(--bg-input);
+    border: 1.5px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    font-weight: 500;
+    outline: none;
+    transition: all var(--transition-base);
+}
+
+.cart-seller-input input::placeholder {
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+.cart-seller-input input:focus {
+    border-color: #6366f1;
+    background: var(--bg-elevated);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SELLERS TABLE
+   ══════════════════════════════════════════════════════════════════════════ */
+#sellers-table thead th,
+#sellers-table tbody td {
+    padding: 1rem 1.2rem;
+    vertical-align: middle;
+}
+
+#sellers-table thead th {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-subtle);
+    white-space: nowrap;
+}
+
+#sellers-table tbody tr {
+    border-bottom: 1px solid var(--border-subtle);
+    transition: background var(--transition-fast);
+}
+
+#sellers-table tbody tr:hover {
+    background: var(--bg-hover);
+}
+
+.seller-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.seller-rank {
+    font-size: 1.3rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.seller-name-text {
+    font-weight: 600;
+    font-size: 0.92rem;
+    color: var(--text-primary);
+}
+
+.seller-since {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    margin-top: 0.15rem;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   SELLER DETAIL MODAL TABLE
+   ══════════════════════════════════════════════════════════════════════════ */
+#seller-sales-table thead th {
+    padding: 0.75rem 1.2rem;
+    font-size: 0.73rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-subtle);
+    white-space: nowrap;
+}
+
+#seller-sales-table tbody td {
+    padding: 0.85rem 1.2rem;
+    border-bottom: 1px solid var(--border-subtle);
+    font-size: 0.85rem;
+    white-space: nowrap;
+}
+
+#seller-sales-table tbody tr:hover {
+    background: var(--bg-hover);
+}
+
+#seller-sales-table tbody tr:last-child td {
+    border-bottom: none;
+}

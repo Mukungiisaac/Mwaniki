@@ -135,6 +135,12 @@ def init_db():
     except Exception:
         pass
 
+    # Add seller_name column to sales table
+    try:
+        cursor.execute("ALTER TABLE sales ADD COLUMN seller_name TEXT NOT NULL DEFAULT ''")
+    except Exception:
+        pass
+
     # Create default admin if no users exist
     cursor.execute('SELECT COUNT(*) FROM users')
     if cursor.fetchone()[0] == 0:
@@ -361,6 +367,7 @@ def process_sale():
     items = data.get('items', [])
     total_amount = data.get('total_amount', 0)
     payment_method = data.get('payment_method', 'Cash')
+    seller_name = data.get('seller_name', '').strip()
 
     # Validate payment method
     if payment_method not in ('Cash', 'M-Pesa'):
@@ -391,8 +398,8 @@ def process_sale():
         # Insert the sale record with payment method
         sale_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         cursor.execute(
-            'INSERT INTO sales (total_amount, payment_method, date, total_profit) VALUES (?, ?, ?, ?)',
-            (total_amount, payment_method, sale_date, 0)
+            'INSERT INTO sales (total_amount, payment_method, date, total_profit, seller_name) VALUES (?, ?, ?, ?, ?)',
+            (total_amount, payment_method, sale_date, 0, seller_name)
         )
         sale_id = cursor.lastrowid
 
@@ -442,6 +449,7 @@ def process_sale():
             'sale_id': sale_id,
             'total': total_amount,
             'payment_method': payment_method,
+            'seller_name': seller_name,
             'date': sale_date
         }), 201
 
@@ -618,6 +626,89 @@ def get_analytics():
         'monthly_sales': [dict(r) for r in monthly_sales],
         'payment_breakdown': [dict(r) for r in payment_breakdown]
     })
+
+
+@app.route('/api/sellers/<seller_name>', methods=['DELETE'])
+@login_required
+@role_required('admin')
+def delete_seller(seller_name):
+    """Delete all sales for a given seller and restore stock."""
+    conn = get_db()
+    cursor = conn.cursor()
+    try:
+        # Get all sale IDs for this seller
+        sales = cursor.execute(
+            'SELECT id FROM sales WHERE seller_name = ?', (seller_name,)
+        ).fetchall()
+        if not sales:
+            conn.close()
+            return jsonify({'error': 'No sales found for this seller'}), 404
+
+        for sale in sales:
+            sid = sale['id']
+            items = cursor.execute(
+                'SELECT product_id, quantity FROM sale_items WHERE sale_id = ?', (sid,)
+            ).fetchall()
+            for item in items:
+                cursor.execute(
+                    'UPDATE products SET stock = stock + ? WHERE id = ?',
+                    (item['quantity'], item['product_id'])
+                )
+            cursor.execute('DELETE FROM sale_items WHERE sale_id = ?', (sid,))
+            cursor.execute('DELETE FROM sales WHERE id = ?', (sid,))
+
+        conn.commit()
+        return jsonify({'message': f'Deleted {len(sales)} sale(s) for "{seller_name}" and restored stock.'})
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/sellers-performance', methods=['GET'])
+@login_required
+@role_required('admin')
+def get_sellers_performance():
+    """Return sales performance grouped by seller name."""
+    conn = get_db()
+
+    sellers = conn.execute('''
+        SELECT 
+            CASE WHEN seller_name = '' OR seller_name IS NULL THEN 'Unknown' ELSE seller_name END as seller,
+            COUNT(*) as total_sales,
+            SUM(total_amount) as total_revenue,
+            SUM(total_net_profit) as total_profit,
+            MIN(date) as first_sale,
+            MAX(date) as last_sale
+        FROM sales
+        GROUP BY seller
+        ORDER BY total_revenue DESC
+    ''').fetchall()
+
+    # Per-seller recent sales
+    result = []
+    for s in sellers:
+        seller_name_key = '' if s['seller'] == 'Unknown' else s['seller']
+        sales = conn.execute('''
+            SELECT id, date, total_amount, total_net_profit, payment_method
+            FROM sales
+            WHERE (seller_name = ? OR (? = '' AND (seller_name = '' OR seller_name IS NULL)))
+            ORDER BY id DESC
+            LIMIT 50
+        ''', (seller_name_key, seller_name_key)).fetchall()
+        result.append({
+            'seller': s['seller'],
+            'total_sales': s['total_sales'],
+            'total_revenue': s['total_revenue'],
+            'total_profit': s['total_profit'],
+            'first_sale': s['first_sale'],
+            'last_sale': s['last_sale'],
+            'sales': [dict(r) for r in sales]
+        })
+
+    conn.close()
+    return jsonify(result)
 
 
 @app.route('/api/stock-tracking', methods=['GET'])

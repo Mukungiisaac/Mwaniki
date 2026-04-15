@@ -64,6 +64,7 @@ function initTabs() {
             if (tab.dataset.tab === 'pos') renderPOSGrid();
             if (tab.dataset.tab === 'stock') loadStockTracking();
             if (tab.dataset.tab === 'monthly') loadMonthlyAnalytics();
+            if (tab.dataset.tab === 'sellers') loadSellersPerformance();
             if (tab.dataset.tab === 'users') {
                 await fetchUsers();
                 loadUsersTable();
@@ -474,6 +475,9 @@ async function processSale() {
         return;
     }
     
+    // Get seller name
+    const sellerName = ($('#cart-seller-name')?.value || '').trim();
+    
     // Calculate total buying price
     const totalBuyingPrice = cart.reduce((sum, item) => sum + (item.cost_price * item.quantity), 0);
     
@@ -497,7 +501,8 @@ async function processSale() {
             price: item.price
         })),
         total_amount: totalSellingPrice,
-        payment_method: selectedPaymentMethod
+        payment_method: selectedPaymentMethod,
+        seller_name: sellerName
     };
 
     // Disable pay button to prevent double-click
@@ -520,6 +525,7 @@ async function processSale() {
         // Clear cart and refresh products
         cart = [];
         $('#total-selling-price').value = ''; // Clear selling price input
+        if ($('#cart-seller-name')) $('#cart-seller-name').value = ''; // Clear seller input
         renderCart();
         await fetchProducts();
         renderPOSGrid();
@@ -1786,6 +1792,7 @@ function initStockTracking() {
 document.addEventListener('DOMContentLoaded', () => {
     initApp();
     initStockTracking();
+    initSellersTab();
 });
 
 // ─── Total Selling Price Functions ─────────────────────────────────────────────
@@ -1828,4 +1835,151 @@ function updateTotalProfit() {
     
     // Enable/disable pay button
     payBtn.disabled = cart.length === 0 || totalSelling <= 0;
+}
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SELLERS PERFORMANCE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+let allSellersData = [];
+
+async function loadSellersPerformance() {
+    try {
+        const res = await fetch('/api/sellers-performance');
+        if (!res.ok) throw new Error('Failed to load');
+        allSellersData = await res.json();
+        renderSellersTable(allSellersData);
+    } catch (err) {
+        showToast('Failed to load sellers data', 'error');
+    }
+}
+
+function renderSellersTable(data) {
+    const tbody   = $('#sellers-table-body');
+    const emptyEl = $('#sellers-empty');
+    const wrapper = $('#sellers-table')?.closest('.table-wrapper');
+
+    // Filter out Unknown sellers
+    const filtered = data.filter(s => s.seller !== 'Unknown');
+
+    // KPI totals (use filtered data)
+    const totalSellers  = filtered.length;
+    const totalSales    = filtered.reduce((s, r) => s + r.total_sales, 0);
+    const totalRevenue  = filtered.reduce((s, r) => s + r.total_revenue, 0);
+    const totalProfit   = filtered.reduce((s, r) => s + r.total_profit, 0);
+
+    if ($('#sellers-kpi-count'))   $('#sellers-kpi-count').textContent   = totalSellers;
+    if ($('#sellers-kpi-sales'))   $('#sellers-kpi-sales').textContent   = totalSales;
+    if ($('#sellers-kpi-revenue')) $('#sellers-kpi-revenue').textContent = formatPrice(totalRevenue);
+    if ($('#sellers-kpi-profit')) {
+        const el = $('#sellers-kpi-profit');
+        el.textContent = (totalProfit < 0 ? '-' : '') + formatPrice(Math.abs(totalProfit));
+        el.className = 'kpi-value ' + (totalProfit >= 0 ? 'text-profit' : 'text-loss');
+    }
+
+    if (filtered.length === 0) {
+        tbody.innerHTML = '';
+        if (wrapper) wrapper.style.display = 'none';
+        emptyEl.style.display = 'flex';
+        return;
+    }
+
+    if (wrapper) wrapper.style.display = 'block';
+    emptyEl.style.display = 'none';
+
+    tbody.innerHTML = filtered.map((s, idx) => {
+        const profitClass = s.total_profit >= 0 ? 'text-profit' : 'text-loss';
+        const profitText  = (s.total_profit < 0 ? '-' : '') + formatPrice(Math.abs(s.total_profit));
+        const rank = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
+        // Find original index in allSellersData for openSellerDetail
+        const origIdx = allSellersData.indexOf(s);
+        return `<tr>
+            <td>
+                <div class="seller-name-cell">
+                    <span class="seller-rank">${rank}</span>
+                    <div>
+                        <div class="seller-name-text">${escHtml(s.seller)}</div>
+                        <div class="seller-since">Since ${s.first_sale ? s.first_sale.split(' ')[0] : '—'}</div>
+                    </div>
+                </div>
+            </td>
+            <td><span class="item-count-badge">${s.total_sales} sale${s.total_sales !== 1 ? 's' : ''}</span></td>
+            <td><strong style="color:var(--primary-400);">${formatPrice(s.total_revenue)}</strong></td>
+            <td><span class="${profitClass}" style="font-weight:600;">${profitText}</span></td>
+            <td style="color:var(--text-muted);font-size:0.82rem;">${s.last_sale ? s.last_sale.split(' ')[0] : '—'}</td>
+            <td>
+                <div class="action-btns">
+                    <button class="btn-view-detail" onclick="openSellerDetail(${origIdx})">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        View
+                    </button>
+                    <button class="btn-delete" onclick="deleteSeller('${escHtml(s.seller)}')" title="Delete seller's sales">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    </button>
+                </div>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function openSellerDetail(idx) {
+    const seller = allSellersData[idx];
+    if (!seller) return;
+
+    $('#seller-detail-name').textContent    = seller.seller;
+    $('#seller-detail-subtitle').textContent = `${seller.total_sales} sales · Revenue: ${formatPrice(seller.total_revenue)}`;
+
+    $('#seller-sales-body').innerHTML = seller.sales.map(s => {
+        const profitClass = s.total_net_profit >= 0 ? 'text-profit' : 'text-loss';
+        const profitText  = (s.total_net_profit < 0 ? '-' : '') + formatPrice(Math.abs(s.total_net_profit));
+        const pmClass = s.payment_method === 'M-Pesa' ? 'pm-mpesa' : 'pm-cash';
+        return `<tr>
+            <td><strong>#${s.id}</strong></td>
+            <td style="color:var(--text-muted);font-size:0.82rem;">${s.date}</td>
+            <td><strong style="color:var(--primary-400);">${formatPrice(s.total_amount)}</strong></td>
+            <td><span class="${profitClass}">${profitText}</span></td>
+            <td><span class="pm-badge ${pmClass}">${escHtml(s.payment_method)}</span></td>
+        </tr>`;
+    }).join('');
+
+    $('#seller-detail-overlay').classList.add('visible');
+}
+
+function initSellersTab() {
+    $('#btn-refresh-sellers')?.addEventListener('click', loadSellersPerformance);
+}
+
+// Global close function called directly from onclick attribute
+function closeSellerModal() {
+    document.getElementById('seller-detail-overlay')?.classList.remove('visible');
+}
+
+// Backdrop click to close seller modal
+document.addEventListener('click', (e) => {
+    if (e.target && e.target.id === 'seller-detail-overlay') {
+        e.target.classList.remove('visible');
+    }
+});
+
+// Escape key closes seller modal
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        document.getElementById('seller-detail-overlay')?.classList.remove('visible');
+    }
+});
+
+async function deleteSeller(sellerName) {
+    if (!confirm(`Delete all sales records for "${sellerName}"? This will restore stock for those sales.`)) return;
+    try {
+        const res = await fetch('/api/sellers/' + encodeURIComponent(sellerName), { method: 'DELETE' });
+        const result = await res.json();
+        if (!res.ok) throw new Error(result.error);
+        showToast(result.message, 'success');
+        loadSellersPerformance();
+        await fetchProducts();
+        renderPOSGrid();
+    } catch (err) {
+        showToast(err.message || 'Failed to delete seller', 'error');
+    }
 }
